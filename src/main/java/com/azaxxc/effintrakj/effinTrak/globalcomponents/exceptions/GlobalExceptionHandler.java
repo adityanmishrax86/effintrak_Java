@@ -8,8 +8,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.ResponseExtractor;
 import org.springframework.web.context.request.WebRequest;
 
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -17,10 +19,10 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<Object> handleIllegalArgumentException(IllegalArgumentException ex) {
-        ErrorMessage body = new ErrorMessage(ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, System.currentTimeMillis(), "An error occurred due to invalid argument");
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+        ErrorMessage body = new ErrorMessage(ex.getMessage(), HttpStatus.BAD_REQUEST, System.currentTimeMillis(), "An error occurred due to invalid argument");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
@@ -42,6 +44,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorMessage> handleResourceNotFoundException(ResourceNotFoundException rsnfe, WebRequest request) {
         ErrorMessage errorMessage = new ErrorMessage(rsnfe.getMessage(), HttpStatus.NOT_FOUND, System.currentTimeMillis(), request.getDescription(false));
         return new ResponseEntity<>(errorMessage, HttpStatus.NOT_FOUND);
+    }
+
+    public ResponseEntity<ErrorMessage> handleDateTimeParseException(DateTimeParseException dtpe, WebRequest request) {
+        ErrorMessage errorMessage = new ErrorMessage(dtpe.getMessage(), HttpStatus.BAD_REQUEST, System.currentTimeMillis(), request.getDescription(false));
+        return new ResponseEntity<>(errorMessage, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(Exception.class)

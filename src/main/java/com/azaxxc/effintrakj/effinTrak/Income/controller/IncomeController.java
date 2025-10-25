@@ -1,9 +1,11 @@
 package com.azaxxc.effintrakj.effinTrak.Income.controller;
 
+import com.azaxxc.effintrakj.effinTrak.Income.dtos.IncomeResponse;
 import com.azaxxc.effintrakj.effinTrak.Income.dtos.NewIncomeRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Income.model.Income;
 import com.azaxxc.effintrakj.effinTrak.Income.service.IncomeService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.dtos.PageableResponse;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import com.azaxxc.effintrakj.effinTrak.users.service.UserService;
 import jakarta.validation.Valid;
@@ -46,21 +48,21 @@ public class IncomeController {
     @GetMapping("/user/{userId}")
     public ResponseEntity<Object> getIncomeByUserId(
             @PathVariable Long userId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end,
             Pageable pageable) {
-        // Default date range if not provided
-        if (startDate == null) startDate = new Date(0); // epoch
-        if (endDate == null) endDate = new Date(); // now
-        Page<Income> incomes = incomeService.getIncomeByUserId(userId, startDate, endDate, pageable);
-        return globalResponseService.success(incomes, "Fetched incomes for user");
+        Page<IncomeResponse> incomes;
+        if (null != start && null != end) {
+            incomes = incomeService.getIncomeByUserIdBetweenDatePeriods(userId, start, end, pageable);
+        } else {
+            incomes = incomeService.getIncomeByUserId(userId, pageable);
+        }
+        PageableResponse<IncomeResponse> response  = new PageableResponse<>(incomes.getContent(), incomes);
+
+        return globalResponseService.success(response, "Fetched incomes for user");
     }
 
-    @GetMapping
-    public ResponseEntity<Object> getAllIncomesByUser() {
-        List<Income> incomes = incomeService.getAllIncomes();
-        return globalResponseService.success(incomes, "Fetched all incomes");
-    }
+
 
 
     @DeleteMapping("/{id}")

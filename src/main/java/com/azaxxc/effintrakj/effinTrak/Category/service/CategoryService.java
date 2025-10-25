@@ -1,28 +1,33 @@
 package com.azaxxc.effintrakj.effinTrak.Category.service;
 
+import com.azaxxc.effintrakj.effinTrak.Category.dtos.CategoryResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.Category.model.Category;
 import com.azaxxc.effintrakj.effinTrak.Category.repo.CategoryRepository;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.mappers.CategoryMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class CategoryService {
     private final CategoryRepository categoryRepository;
+    private final CategoryMapper mapper;
 
     @Autowired
-    public CategoryService(CategoryRepository categoryRepository) {
+    public CategoryService(CategoryRepository categoryRepository, CategoryMapper mapper) {
         this.categoryRepository = categoryRepository;
+        this.mapper = mapper;
     }
 
     public Category saveCategory(Category category) {
         return categoryRepository.save(category);
     }
 
-    public List<Category> getAllCategories() {
-        return categoryRepository.findAll();
+    public List<CategoryResponseDTO> getAllCategories() {
+        return categoryRepository.findAll().stream().map(mapper::toResponseDTO).collect(Collectors.toList());
     }
 
     public Optional<Category> getCategoryById(Long id) {

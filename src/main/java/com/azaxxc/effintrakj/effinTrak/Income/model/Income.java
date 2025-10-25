@@ -5,6 +5,8 @@ import com.azaxxc.effintrakj.effinTrak.accounts.model.BankAccount;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import jakarta.persistence.*;
 import lombok.Data;
+
+import java.time.LocalDate;
 import java.util.Date;
 
 @Data
@@ -23,7 +25,7 @@ public class Income {
 
     @Temporal(TemporalType.DATE)
     @Column(nullable = false)
-    private Date date;
+    private LocalDate date;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)

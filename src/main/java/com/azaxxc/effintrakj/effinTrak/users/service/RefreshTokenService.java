@@ -5,6 +5,7 @@ import com.azaxxc.effintrakj.effinTrak.users.models.RefreshTokens;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import com.azaxxc.effintrakj.effinTrak.users.repo.RefreshTokenRepository;
 import com.azaxxc.effintrakj.effinTrak.users.repo.UserRepository;
+import com.azaxxc.effintrakj.effinTrak.users.repo.UserSummary;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

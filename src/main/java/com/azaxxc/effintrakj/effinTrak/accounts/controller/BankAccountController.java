@@ -1,6 +1,7 @@
 package com.azaxxc.effintrakj.effinTrak.accounts.controller;
 
 import com.azaxxc.effintrakj.effinTrak.accounts.dtos.BankAccountCreateRequestDTO;
+import com.azaxxc.effintrakj.effinTrak.accounts.dtos.BankAccountResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.accounts.model.BankAccount;
 import com.azaxxc.effintrakj.effinTrak.accounts.service.BankAccountService;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
@@ -8,6 +9,7 @@ import com.azaxxc.effintrakj.effinTrak.users.service.UserService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,33 +36,30 @@ public class BankAccountController {
         User user = userService.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
 
-        if(bankAccountService.findByUserId(bankAccountCreateRequestDTO.getUserId()).isEmpty()) {
+        List<BankAccountResponseDTO> banksOfUser = bankAccountService.findByUserId(bankAccountCreateRequestDTO.getUserId());
+
+
+        String newBankName = bankAccountCreateRequestDTO.getBankName().trim();
+        if (banksOfUser.stream()
+                .map(BankAccountResponseDTO::getName)
+                .noneMatch(x -> x != null && x.trim().equalsIgnoreCase(newBankName))) {
             BankAccount bankAccount = new BankAccount();
-            bankAccount.setName(bankAccountCreateRequestDTO.getBankName());
+            bankAccount.setName(newBankName);
             bankAccount.setUser(user);
-
             bankAccountService.saveBankAccount(bankAccount);
-
             return globalResponseService.success("Bank account created successfully");
         } else {
-            return globalResponseService.error("User already has a bank account", org.springframework.http.HttpStatus.BAD_REQUEST);
+            return globalResponseService.error("User already has a bank account", HttpStatus.BAD_REQUEST);
         }
     }
 
-    @GetMapping
+    @GetMapping("/{userId}")
     public ResponseEntity<Object> getAllBankAccounts(@Valid @PathVariable Long userId) {
         User user  = userService.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
 
-        List<BankAccount> accounts = bankAccountService.findByUserId(userId);
+        List<BankAccountResponseDTO> accounts = bankAccountService.findByUserId(userId);
         return globalResponseService.success(accounts, "Fetched all bank accounts");
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<Object> getBankAccountById(@PathVariable Long id) {
-        return bankAccountService.getBankAccountById(id)
-                .map(account -> globalResponseService.success(account, "Fetched bank account"))
-                .orElseGet(() -> globalResponseService.error("Bank account not found", org.springframework.http.HttpStatus.NOT_FOUND));
     }
 
     @DeleteMapping("/{id}")

@@ -2,6 +2,7 @@ package com.azaxxc.effintrakj.effinTrak.Category.controller;
 
 import com.azaxxc.effintrakj.effinTrak.Category.model.Category;
 import com.azaxxc.effintrakj.effinTrak.Category.service.CategoryService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,10 +13,12 @@ import java.util.List;
 @RequestMapping("/api/categories")
 public class CategoryController {
     private final CategoryService categoryService;
+    private final GlobalResponseService globalResponseService;
 
     @Autowired
-    public CategoryController(CategoryService categoryService) {
+    public CategoryController(CategoryService categoryService, GlobalResponseService globalResponseService ) {
         this.categoryService = categoryService;
+        this.globalResponseService = globalResponseService;
     }
 
     @PostMapping
@@ -24,8 +27,11 @@ public class CategoryController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Category>> getAllCategories() {
-        return ResponseEntity.ok(categoryService.getAllCategories());
+    public ResponseEntity<Object> getAllCategories() {
+        return globalResponseService.success(
+                categoryService.getAllCategories(),
+                "Categories retrieved successfully"
+        );
     }
 
     @GetMapping("/{id}")

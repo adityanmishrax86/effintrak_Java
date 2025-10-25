@@ -1,5 +1,6 @@
 package com.azaxxc.effintrakj.effinTrak.accounts.repo;
 
+import com.azaxxc.effintrakj.effinTrak.accounts.dtos.BankAccountResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.accounts.model.BankAccount;
 import org.springframework.data.jpa.repository.JpaRepository;
 
