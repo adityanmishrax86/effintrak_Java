@@ -45,13 +45,14 @@ CREATE TABLE expenses (
     amount DOUBLE PRECISION NOT NULL,
     date DATE NOT NULL,
     category_id INTEGER,
-    category_name VARCHAR(50) NOT NULL,
     payment_method VARCHAR(50),
     paid_to VARCHAR(100),
     is_recurring BOOLEAN DEFAULT FALSE,
     user_id INTEGER NOT NULL,
+    bank_account_id INTEGER NOT NULL,
     CONSTRAINT fk_expense_user FOREIGN KEY (user_id) REFERENCES users(id),
-    CONSTRAINT fk_expense_category FOREIGN KEY (category_id) REFERENCES categories(id)
+    CONSTRAINT fk_expense_category FOREIGN KEY (category_id) REFERENCES categories(id),
+    CONSTRAINT fk_expense_bankaccount FOREIGN KEY (bank_account_id) REFERENCES bank_accounts(id)
 );
 
 CREATE TABLE incomes (

@@ -4,6 +4,7 @@ import com.azaxxc.effintrakj.effinTrak.Category.dtos.CategoryResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.Category.model.Category;
 import com.azaxxc.effintrakj.effinTrak.Category.repo.CategoryRepository;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.mappers.CategoryMapper;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -26,8 +27,14 @@ public class CategoryService {
         return categoryRepository.save(category);
     }
 
+
     public List<CategoryResponseDTO> getAllCategories() {
         return categoryRepository.findAll().stream().map(mapper::toResponseDTO).collect(Collectors.toList());
+    }
+
+    @PostConstruct
+    public List<Category> getCategories() {
+        return categoryRepository.findAll();
     }
 
     public Optional<Category> getCategoryById(Long id) {

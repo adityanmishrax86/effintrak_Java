@@ -15,4 +15,5 @@ public class IncomeResponse {
     private String note;
     private String bankAccount;
     private String date;
+    private Long id;
 }

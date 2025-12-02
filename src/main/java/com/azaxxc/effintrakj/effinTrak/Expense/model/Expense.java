@@ -1,9 +1,12 @@
 package com.azaxxc.effintrakj.effinTrak.Expense.model;
 
 import com.azaxxc.effintrakj.effinTrak.Category.model.Category;
+import com.azaxxc.effintrakj.effinTrak.accounts.model.BankAccount;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import jakarta.persistence.*;
 import lombok.Data;
+
+import java.time.LocalDate;
 import java.util.Date;
 
 @Data
@@ -22,14 +25,12 @@ public class Expense {
 
     @Temporal(TemporalType.DATE)
     @Column(nullable = false)
-    private Date date;
+    private LocalDate date;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Category category;
 
-    @Column(nullable = false, length = 50)
-    private String categoryName;
 
     @Column(length = 50)
     private String paymentMethod;
@@ -42,5 +43,9 @@ public class Expense {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "bank_account_id", nullable = false)
+    private BankAccount bankAccount;
 }
 

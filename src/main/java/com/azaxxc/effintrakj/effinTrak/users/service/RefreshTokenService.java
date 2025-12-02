@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 
 @Service
 public class RefreshTokenService {
@@ -21,14 +22,16 @@ public class RefreshTokenService {
         this.refreshTokenRepository = refreshTokenRepository;
     }
 
-    public RefreshTokens createRefreshToken(User user, String token, long expiryMs) {
+    @Transactional
+    public void createRefreshToken(User user, String token, long expiryMs) {
 
-        RefreshTokens refreshTokens = new RefreshTokens();
+        RefreshTokens refreshTokens = refreshTokenRepository.findByUserId(user.getId()).orElse(new RefreshTokens());
+
         refreshTokens.setToken(token);
         refreshTokens.setUser(user);
         refreshTokens.setExpiryDate(Instant.now().plus(expiryMs, ChronoUnit.MILLIS));
 
-        return refreshTokenRepository.save(refreshTokens);
+        refreshTokenRepository.save(refreshTokens);
     }
 
     public boolean validateRefreshToken(String token) {

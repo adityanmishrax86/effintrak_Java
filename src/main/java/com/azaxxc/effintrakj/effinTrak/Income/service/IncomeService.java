@@ -1,15 +1,19 @@
 package com.azaxxc.effintrakj.effinTrak.Income.service;
 
+import com.azaxxc.effintrakj.effinTrak.Category.dtos.CategoryResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.Category.model.Category;
 import com.azaxxc.effintrakj.effinTrak.Category.service.CategoryService;
 import com.azaxxc.effintrakj.effinTrak.Income.dtos.IncomeResponse;
 import com.azaxxc.effintrakj.effinTrak.Income.dtos.NewIncomeRequestDTO;
+import com.azaxxc.effintrakj.effinTrak.Income.dtos.UpdateIncomeRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Income.model.Income;
 import com.azaxxc.effintrakj.effinTrak.Income.repo.IncomeRepository;
 import com.azaxxc.effintrakj.effinTrak.accounts.model.BankAccount;
 import com.azaxxc.effintrakj.effinTrak.accounts.service.BankAccountService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.mappers.IncomeMapper;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.mappers.PageResponseMapper;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
+import com.azaxxc.effintrakj.effinTrak.users.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +23,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -27,12 +32,19 @@ public class IncomeService {
     private final CategoryService categoryService;
     private final BankAccountService bankAccountService;
     private final IncomeMapper mapper;
+    private final UserService userService;
+    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     @Autowired
-    public IncomeService(IncomeRepository incomeRepository, CategoryService categoryService, BankAccountService bankAccountService, IncomeMapper mapper) {
+    public IncomeService(IncomeRepository incomeRepository,
+                         CategoryService categoryService,
+                         BankAccountService bankAccountService,
+                         UserService userService,
+                         IncomeMapper mapper) {
         this.categoryService = categoryService;
         this.bankAccountService = bankAccountService;
         this.incomeRepository = incomeRepository;
+        this.userService = userService;
         this.mapper = mapper;
 
     }
@@ -55,7 +67,6 @@ public class IncomeService {
         income.setCategory(category);
         income.setBankAccount(bankAccount);
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         income.setDate(formatter.parse(dto.getDate(), java.time.LocalDate::from));
 
         return incomeRepository.save(income);
@@ -67,12 +78,12 @@ public class IncomeService {
             return Page.empty();
         }
 
-        return mapIncomeResponse(incomes, pageable);
+        return PageResponseMapper.mapPageable(incomes, pageable, mapper::toIncomeResponse);
 
     }
 
     public Page<IncomeResponse> getIncomeByUserIdBetweenDatePeriods(Long userId, String startDate, String endDate, Pageable pageable) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
         LocalDate start = formatter.parse(startDate, LocalDate::from);
         LocalDate end = formatter.parse(endDate, LocalDate::from);
 
@@ -81,34 +92,35 @@ public class IncomeService {
             return Page.empty();
         }
 
-        return mapIncomeResponse(incomes, pageable);
+        return PageResponseMapper.mapPageable(incomes, pageable, mapper::toIncomeResponse);
     }
 
-    public IncomeResponse updateIncomeDetail(Long incomeId, NewIncomeRequestDTO dto) {
-        Income currentIncome = incomeRepository.findById(incomeId).orElseThrow(() -> new RuntimeException("Invalid Income ID"));
+    public IncomeResponse updateIncomeDetail(Long incomeId,  UpdateIncomeRequestDTO dto) {
+        User currentUser = userService.findById(dto.getUserId()).orElseThrow(() -> new RuntimeException("Invalid User ID Request"));
+        Income currentIncome = incomeRepository.findByUserIdAndId(currentUser.getId(), incomeId).orElseThrow(() -> new RuntimeException("Invalid Income ID"));
         currentIncome.setAmount(dto.getAmount());
         currentIncome.setSource(dto.getSource());
         currentIncome.setNote(dto.getNote());
         currentIncome.setDescription(dto.getDescription());
-        currentIncome.setCategory();
+        LocalDate date = formatter.parse(dto.getDate(), LocalDate::from);
+        currentIncome.setDate(date);
+        Category ctg = categoryService.getCategories().stream().filter(x -> Objects.equals(x.getId(), dto.getCategoryId()))
+                .findFirst().orElseThrow(() -> new IllegalArgumentException(("No Category found with id:" + dto.getCategoryId())));
+        currentIncome.setCategory(ctg);
 
-        return mapper.toIncomeResponse(updatedIncome);
+        try {
+            incomeRepository.save(currentIncome);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw new IllegalArgumentException("Couldn't update the Income Transaction.");
+        }
+
+
+        return mapper.toIncomeResponse(currentIncome);
     }
 
     public void deleteIncome(Long id) {
         incomeRepository.deleteById(id);
     }
 
-    private Page<IncomeResponse> mapIncomeResponse(Page<Income> incomes, Pageable pageable) {
-
-        List<IncomeResponse> incomeResponses = incomes.getContent().stream()
-                .map(mapper::toIncomeResponse)
-                .toList();
-
-        return PageableExecutionUtils.getPage(
-                incomeResponses,
-                pageable,
-                incomes::getTotalElements
-        );
-    }
 }

@@ -55,8 +55,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                path.startsWith("/v3/api-docs.yaml/") ||
                path.startsWith("/webjars/") ||
                path.equals("/api/v1/users/register") ||
-               path.equals("/api/v1/users/login") ||
-               path.equals("/api/v1/users/logout");
+               path.equals("/api/v1/users/login");
     }
 
 }

@@ -2,6 +2,7 @@ package com.azaxxc.effintrakj.effinTrak.Income.controller;
 
 import com.azaxxc.effintrakj.effinTrak.Income.dtos.IncomeResponse;
 import com.azaxxc.effintrakj.effinTrak.Income.dtos.NewIncomeRequestDTO;
+import com.azaxxc.effintrakj.effinTrak.Income.dtos.UpdateIncomeRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Income.model.Income;
 import com.azaxxc.effintrakj.effinTrak.Income.service.IncomeService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
@@ -62,7 +63,12 @@ public class IncomeController {
         return globalResponseService.success(response, "Fetched incomes for user");
     }
 
+    @PutMapping("/user/{incomeId}")
+    public ResponseEntity<Object> updateIncome(@PathVariable Long incomeId, @RequestBody UpdateIncomeRequestDTO dto) {
+        IncomeResponse icr = incomeService.updateIncomeDetail(incomeId, dto);
 
+        return globalResponseService.success(icr, "Income updated successfully");
+    }
 
 
     @DeleteMapping("/{id}")

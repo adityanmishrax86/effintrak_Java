@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class NewIncomeRequestDTO {
+public class UpdateIncomeRequestDTO {
     private String description;
     private Double amount;
     private String date; // Consider using LocalDate for better date handling
@@ -13,5 +13,4 @@ public class NewIncomeRequestDTO {
     private String source;
     private String note;
     private Long userId;
-    private Long bankAccountId;
 }
