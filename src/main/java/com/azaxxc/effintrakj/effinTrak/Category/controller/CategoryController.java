@@ -1,5 +1,7 @@
 package com.azaxxc.effintrakj.effinTrak.Category.controller;
 
+import com.azaxxc.effintrakj.effinTrak.Category.dtos.CategoryResponseDTO;
+import com.azaxxc.effintrakj.effinTrak.Category.dtos.UpdateCategoryRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Category.model.Category;
 import com.azaxxc.effintrakj.effinTrak.Category.service.CategoryService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
@@ -39,6 +41,12 @@ public class CategoryController {
         return categoryService.getCategoryById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Object> updateCategory(@PathVariable Long id, @RequestBody UpdateCategoryRequestDTO dto) {
+        CategoryResponseDTO updatedCategory = categoryService.updateCategory(id, dto.getName());
+        return globalResponseService.success(updatedCategory, "Category updated successfully");
     }
 
     @DeleteMapping("/{id}")

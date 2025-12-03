@@ -66,6 +66,19 @@ public class TransactionService {
                 income.getSource());
     }
 
+    public List<TransactionResponseDTO> searchTransactions(Long userId, String search) {
+        List<Income> incomes = incomeRepository.findByUserIdAndDescriptionContainingIgnoreCase(userId, search);
+        List<Expense> expenses = expenseRepository.findByUserIdAndDescriptionContainingIgnoreCase(userId, search);
+
+        List<TransactionResponseDTO> transactions = new ArrayList<>();
+        transactions.addAll(incomes.stream().map(this::mapIncomeToDTO).toList());
+        transactions.addAll(expenses.stream().map(this::mapExpenseToDTO).toList());
+
+        return transactions.stream()
+                .sorted(Comparator.comparing(TransactionResponseDTO::getDate).reversed())
+                .collect(Collectors.toList());
+    }
+
     private TransactionResponseDTO mapExpenseToDTO(Expense expense) {
         return new TransactionResponseDTO(
                 expense.getId(),
@@ -73,7 +86,7 @@ public class TransactionService {
                 expense.getAmount(),
                 expense.getDate().toString(),
                 "EXPENSE",
-                expense.getCategory().getName(),
+                expense.getCategory() != null ? expense.getCategory().getName() : "",
                 expense.getPaidTo());
     }
 }

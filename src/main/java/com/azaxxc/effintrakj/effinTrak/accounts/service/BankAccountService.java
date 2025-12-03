@@ -45,5 +45,20 @@ public class BankAccountService {
                 .map(mapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
+
+    public BankAccountResponseDTO updateBankAccount(Long id, String name, Double balance) {
+        BankAccount bankAccount = bankAccountRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Bank account not found with id: " + id));
+
+        if (name != null && !name.trim().isEmpty()) {
+            bankAccount.setName(name.trim());
+        }
+        if (balance != null) {
+            bankAccount.setBalance(balance);
+        }
+
+        BankAccount updatedAccount = bankAccountRepository.save(bankAccount);
+        return mapper.toResponseDTO(updatedAccount);
+    }
 }
 

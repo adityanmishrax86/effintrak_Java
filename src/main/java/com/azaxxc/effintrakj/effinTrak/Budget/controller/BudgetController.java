@@ -2,6 +2,7 @@ package com.azaxxc.effintrakj.effinTrak.Budget.controller;
 
 import com.azaxxc.effintrakj.effinTrak.Budget.dtos.BudgetRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Budget.dtos.BudgetResponseDTO;
+import com.azaxxc.effintrakj.effinTrak.Budget.dtos.UpdateBudgetRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Budget.service.BudgetService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
 import org.springframework.http.ResponseEntity;
@@ -33,9 +34,15 @@ public class BudgetController {
         return globalResponseService.success(budgets, "Fetched budgets for user");
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<Object> updateBudget(@PathVariable Long id, @RequestBody UpdateBudgetRequestDTO dto) {
+        BudgetResponseDTO updatedBudget = budgetService.updateBudget(id, dto);
+        return globalResponseService.success(updatedBudget, "Budget updated successfully");
+    }
+
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteBudget(@PathVariable Long id) {
+    public ResponseEntity<Object> deleteBudget(@PathVariable Long id) {
         budgetService.deleteBudget(id);
-        return ResponseEntity.noContent().build();
+        return globalResponseService.success("Budget deleted successfully");
     }
 }

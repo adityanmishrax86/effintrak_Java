@@ -35,4 +35,12 @@ public class TransactionController {
                 endDate);
         return globalResponseService.success(transactions, "Fetched transactions for user between dates");
     }
+
+    @GetMapping("/user/{userId}/search")
+    public ResponseEntity<Object> searchTransactions(
+            @PathVariable Long userId,
+            @RequestParam String search) {
+        List<TransactionResponseDTO> transactions = transactionService.searchTransactions(userId, search);
+        return globalResponseService.success(transactions, "Search results for transactions");
+    }
 }

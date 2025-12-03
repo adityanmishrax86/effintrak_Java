@@ -2,6 +2,7 @@ package com.azaxxc.effintrakj.effinTrak.Budget.service;
 
 import com.azaxxc.effintrakj.effinTrak.Budget.dtos.BudgetRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Budget.dtos.BudgetResponseDTO;
+import com.azaxxc.effintrakj.effinTrak.Budget.dtos.UpdateBudgetRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Budget.model.Budget;
 import com.azaxxc.effintrakj.effinTrak.Budget.repo.BudgetRepository;
 import com.azaxxc.effintrakj.effinTrak.Category.model.Category;
@@ -59,6 +60,42 @@ public class BudgetService {
         return budgetRepository.findByUserId(userId).stream()
                 .map(mapper::toBudgetResponse)
                 .collect(Collectors.toList());
+    }
+
+    public BudgetResponseDTO updateBudget(Long id, UpdateBudgetRequestDTO dto) {
+        Budget currentBudget = budgetRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Budget not found with id: " + id));
+
+        if (dto.getAmount() != null) {
+            if (dto.getAmount() <= 0) {
+                throw new IllegalArgumentException("Budget amount must be greater than zero.");
+            }
+            currentBudget.setAmount(dto.getAmount());
+        }
+        if (dto.getStartDate() != null && !dto.getStartDate().isEmpty()) {
+            currentBudget.setStartDate(LocalDate.parse(dto.getStartDate(), formatter));
+        }
+        if (dto.getEndDate() != null && !dto.getEndDate().isEmpty()) {
+            currentBudget.setEndDate(LocalDate.parse(dto.getEndDate(), formatter));
+        }
+        if (dto.getCategoryId() != null) {
+            Category category = categoryService.getCategoryById(dto.getCategoryId())
+                    .orElseThrow(() -> new IllegalArgumentException("Category not found"));
+            currentBudget.setCategory(category);
+        }
+        if (dto.getAlertThreshold() != null) {
+            if (dto.getAlertThreshold() <= 0) {
+                throw new IllegalArgumentException("Alert threshold must be greater than zero.");
+            }
+            currentBudget.setAlertThreshold(dto.getAlertThreshold());
+        }
+
+        try {
+            Budget updatedBudget = budgetRepository.save(currentBudget);
+            return mapper.toBudgetResponse(updatedBudget);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Couldn't update the budget.");
+        }
     }
 
     public void deleteBudget(Long id) {

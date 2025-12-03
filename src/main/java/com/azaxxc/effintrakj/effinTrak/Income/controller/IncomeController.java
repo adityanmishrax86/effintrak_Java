@@ -51,9 +51,19 @@ public class IncomeController {
             @PathVariable Long userId,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Double minAmount,
+            @RequestParam(required = false) Double maxAmount,
+            @RequestParam(required = false) Long bankAccountId,
             Pageable pageable) {
         Page<IncomeResponse> incomes;
-        if (null != start && null != end) {
+        
+        // Use advanced filtering if any filter parameters are provided
+        if (categoryId != null || minAmount != null || maxAmount != null || 
+            bankAccountId != null || (start != null && end != null)) {
+            incomes = incomeService.getIncomesWithFilters(
+                    userId, categoryId, minAmount, maxAmount, bankAccountId, start, end, pageable);
+        } else if (null != start && null != end) {
             incomes = incomeService.getIncomeByUserIdBetweenDatePeriods(userId, start, end, pageable);
         } else {
             incomes = incomeService.getIncomeByUserId(userId, pageable);
@@ -61,6 +71,14 @@ public class IncomeController {
         PageableResponse<IncomeResponse> response  = new PageableResponse<>(incomes.getContent(), incomes);
 
         return globalResponseService.success(response, "Fetched incomes for user");
+    }
+
+    @GetMapping("/user/{userId}/search")
+    public ResponseEntity<Object> searchIncomes(
+            @PathVariable Long userId,
+            @RequestParam String search) {
+        List<IncomeResponse> incomes = incomeService.searchIncomesByDescription(userId, search);
+        return globalResponseService.success(incomes, "Search results for incomes");
     }
 
     @PutMapping("/user/{incomeId}")

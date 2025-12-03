@@ -119,6 +119,28 @@ public class IncomeService {
         return mapper.toIncomeResponse(currentIncome);
     }
 
+    public Page<IncomeResponse> getIncomesWithFilters(Long userId, Long categoryId, Double minAmount, Double maxAmount,
+                                                      Long bankAccountId, String startDate, String endDate, Pageable pageable) {
+        LocalDate start = startDate != null ? formatter.parse(startDate, LocalDate::from) : null;
+        LocalDate end = endDate != null ? formatter.parse(endDate, LocalDate::from) : null;
+
+        Page<Income> incomes = incomeRepository.findIncomesWithFilters(
+                userId, categoryId, minAmount, maxAmount, bankAccountId, start, end, pageable);
+
+        if (incomes.isEmpty()) {
+            return Page.empty();
+        }
+
+        return PageResponseMapper.mapPageable(incomes, pageable, mapper::toIncomeResponse);
+    }
+
+    public List<IncomeResponse> searchIncomesByDescription(Long userId, String search) {
+        List<Income> incomes = incomeRepository.findByUserIdAndDescriptionContainingIgnoreCase(userId, search);
+        return incomes.stream()
+                .map(mapper::toIncomeResponse)
+                .toList();
+    }
+
     public void deleteIncome(Long id) {
         incomeRepository.deleteById(id);
     }

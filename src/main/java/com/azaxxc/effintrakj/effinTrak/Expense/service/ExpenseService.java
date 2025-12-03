@@ -121,6 +121,29 @@ public class ExpenseService {
 
     }
 
+    public Page<ExpenseResponse> getExpensesWithFilters(Long userId, Long categoryId, Double minAmount, Double maxAmount,
+                                                         String paymentMethod, Long bankAccountId, String startDate,
+                                                         String endDate, Pageable pageable) {
+        LocalDate start = startDate != null ? formatter.parse(startDate, LocalDate::from) : null;
+        LocalDate end = endDate != null ? formatter.parse(endDate, LocalDate::from) : null;
+
+        Page<Expense> expenses = expenseRepository.findExpensesWithFilters(
+                userId, categoryId, minAmount, maxAmount, paymentMethod, bankAccountId, start, end, pageable);
+
+        if (expenses.isEmpty()) {
+            return Page.empty();
+        }
+
+        return PageResponseMapper.mapPageable(expenses, pageable, mapper::toExpenseResponse);
+    }
+
+    public List<ExpenseResponse> searchExpensesByDescription(Long userId, String search) {
+        List<Expense> expenses = expenseRepository.findByUserIdAndDescriptionContainingIgnoreCase(userId, search);
+        return expenses.stream()
+                .map(mapper::toExpenseResponse)
+                .toList();
+    }
+
     public void deleteExpense(Long id) {
         expenseRepository.deleteById(id);
     }

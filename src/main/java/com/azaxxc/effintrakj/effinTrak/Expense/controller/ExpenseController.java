@@ -49,16 +49,35 @@ public class ExpenseController {
             @PathVariable Long userId,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Double minAmount,
+            @RequestParam(required = false) Double maxAmount,
+            @RequestParam(required = false) String paymentMethod,
+            @RequestParam(required = false) Long bankAccountId,
             Pageable pageable) {
         Page<ExpenseResponse> expenses;
-        if (null != start && null != end) {
+        
+        // Use advanced filtering if any filter parameters are provided
+        if (categoryId != null || minAmount != null || maxAmount != null || 
+            paymentMethod != null || bankAccountId != null || (start != null && end != null)) {
+            expenses = expenseService.getExpensesWithFilters(
+                    userId, categoryId, minAmount, maxAmount, paymentMethod, bankAccountId, start, end, pageable);
+        } else if (null != start && null != end) {
             expenses = expenseService.getExpenseByUserIdBetweenDatePeriods(userId, start, end, pageable);
         } else {
             expenses = expenseService.getExpenseByUserId(userId, pageable);
         }
         PageableResponse<ExpenseResponse> response  = new PageableResponse<>(expenses.getContent(), expenses);
 
-        return globalResponseService.success(response, "Fetched incomes for user");
+        return globalResponseService.success(response, "Fetched expenses for user");
+    }
+
+    @GetMapping("/user/{userId}/search")
+    public ResponseEntity<Object> searchExpenses(
+            @PathVariable Long userId,
+            @RequestParam String search) {
+        List<ExpenseResponse> expenses = expenseService.searchExpensesByDescription(userId, search);
+        return globalResponseService.success(expenses, "Search results for expenses");
     }
 
     @PutMapping("/user/{expenseId}")
