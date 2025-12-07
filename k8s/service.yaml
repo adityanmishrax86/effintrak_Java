@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: effintrak-app-service
+  labels:
+    app: effintrak
+    component: backend
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: effintrak
+    component: backend
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: effintrak-postgres-service
+  labels:
+    app: effintrak
+    component: database
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  selector:
+    app: effintrak
+    component: database
+  clusterIP: None
+

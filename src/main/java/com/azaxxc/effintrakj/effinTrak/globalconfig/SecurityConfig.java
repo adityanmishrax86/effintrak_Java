@@ -30,8 +30,10 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/v3/api-docs.yaml",
                                 "/v3/api-docs.yaml/**",
-                                "/webjars/**"
-                        ).permitAll() // Allow registration endpoint
+                                "/webjars/**",
+                                "/actuator/health",
+                                "/actuator/health/**"
+                        ).permitAll() // Allow registration and health check endpoints
                         .anyRequest().authenticated() // All other requests require authentication
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
