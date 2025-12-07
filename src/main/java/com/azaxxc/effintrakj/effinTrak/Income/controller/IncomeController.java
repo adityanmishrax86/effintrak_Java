@@ -2,6 +2,7 @@ package com.azaxxc.effintrakj.effinTrak.Income.controller;
 
 import com.azaxxc.effintrakj.effinTrak.Income.dtos.IncomeResponse;
 import com.azaxxc.effintrakj.effinTrak.Income.dtos.NewIncomeRequestDTO;
+import com.azaxxc.effintrakj.effinTrak.Income.dtos.UpdateIncomeRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Income.model.Income;
 import com.azaxxc.effintrakj.effinTrak.Income.service.IncomeService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
@@ -50,9 +51,19 @@ public class IncomeController {
             @PathVariable Long userId,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Double minAmount,
+            @RequestParam(required = false) Double maxAmount,
+            @RequestParam(required = false) Long bankAccountId,
             Pageable pageable) {
         Page<IncomeResponse> incomes;
-        if (null != start && null != end) {
+        
+        // Use advanced filtering if any filter parameters are provided
+        if (categoryId != null || minAmount != null || maxAmount != null || 
+            bankAccountId != null || (start != null && end != null)) {
+            incomes = incomeService.getIncomesWithFilters(
+                    userId, categoryId, minAmount, maxAmount, bankAccountId, start, end, pageable);
+        } else if (null != start && null != end) {
             incomes = incomeService.getIncomeByUserIdBetweenDatePeriods(userId, start, end, pageable);
         } else {
             incomes = incomeService.getIncomeByUserId(userId, pageable);
@@ -62,7 +73,20 @@ public class IncomeController {
         return globalResponseService.success(response, "Fetched incomes for user");
     }
 
+    @GetMapping("/user/{userId}/search")
+    public ResponseEntity<Object> searchIncomes(
+            @PathVariable Long userId,
+            @RequestParam String search) {
+        List<IncomeResponse> incomes = incomeService.searchIncomesByDescription(userId, search);
+        return globalResponseService.success(incomes, "Search results for incomes");
+    }
 
+    @PutMapping("/user/{incomeId}")
+    public ResponseEntity<Object> updateIncome(@PathVariable Long incomeId, @RequestBody UpdateIncomeRequestDTO dto) {
+        IncomeResponse icr = incomeService.updateIncomeDetail(incomeId, dto);
+
+        return globalResponseService.success(icr, "Income updated successfully");
+    }
 
 
     @DeleteMapping("/{id}")

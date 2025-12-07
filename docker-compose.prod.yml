@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: effintrak-postgres-prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-effintrak}
+      POSTGRES_USER: ${POSTGRES_USER:-effintrak_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/main/resources/sql/schema/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-effintrak_user} -d ${POSTGRES_DB:-effintrak}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - effintrak-network
+    restart: unless-stopped
+    # Security: run as non-root user
+    user: "999:999"
+
+  # Spring Boot Application
+  app:
+    image: effintrak:latest
+    container_name: effintrak-app-prod
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-effintrak}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-effintrak_user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_DDL_AUTO:-validate}
+      SPRING_JPA_SHOW_SQL: "false"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      # Production JVM Options
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+      # Logging
+      LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - effintrak-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  effintrak-network:
+    driver: bridge
+

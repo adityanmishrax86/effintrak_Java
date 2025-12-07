@@ -2,6 +2,7 @@ package com.azaxxc.effintrakj.effinTrak.accounts.controller;
 
 import com.azaxxc.effintrakj.effinTrak.accounts.dtos.BankAccountCreateRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.accounts.dtos.BankAccountResponseDTO;
+import com.azaxxc.effintrakj.effinTrak.accounts.dtos.UpdateBankAccountRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.accounts.model.BankAccount;
 import com.azaxxc.effintrakj.effinTrak.accounts.service.BankAccountService;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
@@ -60,6 +61,12 @@ public class BankAccountController {
 
         List<BankAccountResponseDTO> accounts = bankAccountService.findByUserId(userId);
         return globalResponseService.success(accounts, "Fetched all bank accounts");
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Object> updateBankAccount(@PathVariable Long id, @RequestBody UpdateBankAccountRequestDTO dto) {
+        BankAccountResponseDTO updatedAccount = bankAccountService.updateBankAccount(id, dto.getName(), dto.getBalance());
+        return globalResponseService.success(updatedAccount, "Bank account updated successfully");
     }
 
     @DeleteMapping("/{id}")

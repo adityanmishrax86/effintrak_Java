@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: effintrak-config
+  labels:
+    app: effintrak
+data:
+  datasource.url: "jdbc:postgresql://effintrak-postgres-service:5432/effintrak"
+  jpa.ddl-auto: "validate"
+  db.name: "effintrak"
+  app.name: "effinTrak"
+  logging.level.root: "INFO"
+  logging.level.com.azaxxc.effintrakj: "DEBUG"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-sql
+  labels:
+    app: effintrak
+    component: database
+data:
+  schema.sql: |
+    -- Add your schema.sql content here
+    -- Or reference it from a file
+

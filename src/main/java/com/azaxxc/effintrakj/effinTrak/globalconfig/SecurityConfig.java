@@ -24,15 +24,16 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/v1/users/register",
                                 "/api/v1/users/login",
-                                "/api/v1/users/logout",
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs",
                                 "/v3/api-docs/**",
                                 "/v3/api-docs.yaml",
                                 "/v3/api-docs.yaml/**",
-                                "/webjars/**"
-                        ).permitAll() // Allow registration endpoint
+                                "/webjars/**",
+                                "/actuator/health",
+                                "/actuator/health/**"
+                        ).permitAll() // Allow registration and health check endpoints
                         .anyRequest().authenticated() // All other requests require authentication
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
