@@ -1,5 +1,6 @@
 package com.azaxxc.effintrakj.effinTrak.users.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -15,9 +16,9 @@ public class User {
     private String lastName;
     private String email;
     private String phoneNumber;
+    @JsonIgnore
     private String password;
     private String role;
     private boolean isActive;
 
 }
-

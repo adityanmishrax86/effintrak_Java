@@ -1,7 +1,6 @@
 package com.azaxxc.effintrakj.effinTrak.globalcomponents.filters;
 
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.JWTUtil;
-import com.azaxxc.effintrakj.effinTrak.users.service.UserService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,11 +18,9 @@ import java.util.Collections;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private JWTUtil jwtUtil;
-    private UserService userService;
 
-    public JwtAuthFilter(JWTUtil jwtUtil, UserService userService) {
+    public JwtAuthFilter(JWTUtil jwtUtil) {
         this.jwtUtil = jwtUtil;
-        this.userService = userService;
     }
 
     @Override

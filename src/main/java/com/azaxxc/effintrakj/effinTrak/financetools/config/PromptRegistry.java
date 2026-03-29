@@ -9,6 +9,10 @@ package com.azaxxc.effintrakj.effinTrak.financetools.config;
  */
 public class PromptRegistry {
 
+    private static String currentDate() {
+        return ChatSystemConfig.getTodayDate();
+    }
+
     // ==================== INTENT ANALYSIS PROMPTS ====================
 
     public static String getIntentAnalysisPrompt(String userContext, String userRequest) {
@@ -54,9 +58,9 @@ public class PromptRegistry {
             - If category name is mentioned, match to the corresponding ID from the categories context above
             - If payment method/account is specified, identify the corresponding account ID
             - Ensure all numerical values are properly formatted
-            - If no specific date is provided, use the current date: 2026-02-02
+            - If no specific date is provided, use the current date: %s
             - Maintain professional description formatting""",
-            userContext, userRequest);
+            userContext, userRequest, currentDate());
     }
 
     public static String getIncomeParameterExtractionPrompt(String userContext, String userRequest) {
@@ -74,10 +78,10 @@ public class PromptRegistry {
             
             EXTRACTION GUIDELINES:
             - Numeric values should be precise and properly formatted
-            - If no specific date is provided, use the current date: 2026-02-02
+            - If no specific date is provided, use the current date: %s
             - Income description should clearly identify the source (e.g., salary, freelance, bonus)
             - Maintain professional formatting throughout""",
-            userContext, userRequest);
+            userContext, userRequest, currentDate());
     }
 
     public static String getUpdateExpenseParameterExtractionPrompt(String userContext, String userRequest) {
@@ -99,9 +103,9 @@ public class PromptRegistry {
             EXTRACTION GUIDELINES:
             - EXPENSE_ID is mandatory; if not provided, respond with: EXPENSE_ID: REQUIRED
             - Mark unchanged fields as "NONE"
-            - Use current date reference: 2026-02-02
+            - Use current date reference: %s
             - Validate all numeric values before extraction""",
-            userContext, userRequest);
+            userContext, userRequest, currentDate());
     }
 
     public static String getDeleteExpenseParameterExtractionPrompt(String userContext, String userRequest) {
@@ -120,8 +124,8 @@ public class PromptRegistry {
             - EXPENSE_ID is mandatory; if not provided, respond with: EXPENSE_ID: REQUIRED
             - CONFIRMATION must be explicitly affirmed by the user for the operation to proceed
             - Deletion is a permanent action and requires clear user intent
-            - Current date reference: 2026-02-02""",
-            userContext, userRequest);
+            - Current date reference: %s""",
+            userContext, userRequest, currentDate());
     }
 
     // ==================== RESPONSE FORMATTING PROMPTS ====================
@@ -182,7 +186,7 @@ public class PromptRegistry {
                "3. DATE HANDLING: Ensure proper date formatting and interpretation.\n" +
                "   - Use ISO 8601 format (yyyy-MM-dd)\n" +
                "   - Interpret relative dates (yesterday, last week, etc.) accurately\n" +
-               "   - Current reference date: 2026-02-02\n\n" +
+               "   - Current reference date: " + currentDate() + "\n\n" +
                "4. AMOUNT VALIDATION: Verify numerical accuracy.\n" +
                "   - Accept values with or without currency symbols\n" +
                "   - Ensure two decimal place precision for currency\n\n" +
@@ -252,4 +256,3 @@ public class PromptRegistry {
         };
     }
 }
-

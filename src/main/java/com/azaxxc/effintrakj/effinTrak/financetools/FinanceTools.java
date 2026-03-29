@@ -9,14 +9,19 @@ import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import com.azaxxc.effintrakj.effinTrak.Bills.service.BillService;
 import com.azaxxc.effintrakj.effinTrak.Budget.service.BudgetService;
 import com.azaxxc.effintrakj.effinTrak.Budget.dtos.BudgetRequestDTO;
+import com.azaxxc.effintrakj.effinTrak.Budget.dtos.UpdateBudgetRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Credits.service.CreditService;
 import com.azaxxc.effintrakj.effinTrak.Credits.dtos.CreditRequestDTO;
+import com.azaxxc.effintrakj.effinTrak.Credits.dtos.UpdateCreditRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Savings.service.SavingsService;
 import com.azaxxc.effintrakj.effinTrak.Savings.dtos.SavingsRequestDTO;
+import com.azaxxc.effintrakj.effinTrak.Savings.dtos.UpdateSavingsRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Subscription.service.SubscriptionService;
 import com.azaxxc.effintrakj.effinTrak.Subscription.dtos.SubscriptionRequestDTO;
+import com.azaxxc.effintrakj.effinTrak.Subscription.dtos.UpdateSubscriptionRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Transfer.service.TransferService;
 import com.azaxxc.effintrakj.effinTrak.Transfer.dtos.TransferRequestDTO;
+import com.azaxxc.effintrakj.effinTrak.RecurringTransaction.dtos.UpdateRecurringTransactionRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.RecurringTransaction.service.RecurringTransactionService;
 import com.azaxxc.effintrakj.effinTrak.RecurringTransaction.dtos.RecurringTransactionRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Transaction.service.TransactionService;
@@ -27,7 +32,10 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 public class FinanceTools {
@@ -292,8 +300,9 @@ public class FinanceTools {
                 return "Error: User not found";
             }
 
-            // Implementation depends on your CreditService update API
-            logger.info("Marking bill {} as paid for user {}", billId, userId);
+            UpdateCreditRequestDTO update = new UpdateCreditRequestDTO();
+            update.setPaid(true);
+            creditService.updateCreditForUser(userId, billId, update);
             return "Success: Bill marked as paid";
         } catch (Exception e) {
             logger.error("Failed to mark bill as paid", e);
@@ -310,8 +319,11 @@ public class FinanceTools {
                 return "Error: User not found";
             }
 
-            // Implementation depends on your BudgetService update API
-            logger.info("Updating budget {} with amount ${}, dates: {} to {}", budgetId, amount, startDate, endDate);
+            UpdateBudgetRequestDTO update = new UpdateBudgetRequestDTO();
+            update.setAmount(amount);
+            update.setStartDate(startDate);
+            update.setEndDate(endDate);
+            budgetService.updateBudgetForUser(userId, budgetId, update);
             return "Success: Budget updated with amount $" + amount;
         } catch (Exception e) {
             logger.error("Failed to update budget", e);
@@ -382,7 +394,6 @@ public class FinanceTools {
                 return "Error: User not found";
             }
 
-            // Create an expense entry to record the credit payment
             var credits = creditService.getCreditsByUserId(userId);
             var credit = credits.stream().filter(c -> c.getId().equals(creditId)).findFirst();
 
@@ -390,7 +401,10 @@ public class FinanceTools {
                 return "Error: Credit not found";
             }
 
-            logger.info("Recording payment of ${} for credit {} on date {}", paymentAmount, creditId, paymentDate);
+            UpdateCreditRequestDTO update = new UpdateCreditRequestDTO();
+            update.setPaid(paymentAmount >= credit.get().getAmount());
+            update.setDueDate(paymentDate);
+            creditService.updateCreditForUser(userId, creditId, update);
             return "Success: Payment of $" + paymentAmount + " recorded for credit on " + paymentDate;
         } catch (Exception e) {
             logger.error("Failed to record credit payment", e);
@@ -499,7 +513,9 @@ public class FinanceTools {
             double remaining = goal.getTargetAmount() - newBalance;
             double percentage = (newBalance / goal.getTargetAmount()) * 100;
 
-            logger.info("Adding ${} to savings goal {} for user {}", depositAmount, savingsId, userId);
+            UpdateSavingsRequestDTO update = new UpdateSavingsRequestDTO();
+            update.setBalance(newBalance);
+            savingsService.updateSavingsForUser(userId, savingsId, update);
             return String.format("Success: Deposited $%.2f to '%s'\nNew Balance: $%.2f / $%.2f (%.1f%% complete)\nRemaining: $%.2f",
                     depositAmount, goal.getName(), newBalance, goal.getTargetAmount(), percentage, remaining);
         } catch (Exception e) {
@@ -531,7 +547,9 @@ public class FinanceTools {
             double remaining = goal.getTargetAmount() - newBalance;
             double percentage = (newBalance / goal.getTargetAmount()) * 100;
 
-            logger.info("Withdrawing ${} from savings goal {} for user {}", withdrawalAmount, savingsId, userId);
+            UpdateSavingsRequestDTO update = new UpdateSavingsRequestDTO();
+            update.setBalance(newBalance);
+            savingsService.updateSavingsForUser(userId, savingsId, update);
             return String.format("Success: Withdrew $%.2f from '%s'\nNew Balance: $%.2f / $%.2f (%.1f%% complete)\nRemaining: $%.2f",
                     withdrawalAmount, goal.getName(), newBalance, goal.getTargetAmount(), percentage, remaining);
         } catch (Exception e) {
@@ -616,7 +634,10 @@ public class FinanceTools {
             }
 
             var sub = subscription.get();
-            logger.info("Canceling subscription {} with end date {}", subscriptionId, endDate);
+            UpdateSubscriptionRequestDTO update = new UpdateSubscriptionRequestDTO();
+            update.setEndDate(endDate);
+            update.setIsActive(false);
+            subscriptionService.updateSubscriptionForUser(userId, subscriptionId, update);
             return String.format("Success: Subscription '%s' cancelled with end date %s\nRefund Amount: $%.2f",
                     sub.getName(), endDate, sub.getPrice());
         } catch (Exception e) {
@@ -659,16 +680,26 @@ public class FinanceTools {
                 return "Error: User not found";
             }
 
-            // This would use a transfer repository or service to fetch transfers
-            // For now, returning a template response
-            logger.info("Fetching transfer history for user {} from {} to {}", userId, fromDate, toDate);
-
-            StringBuilder result = new StringBuilder("Transfer History");
-            if (fromDate != null && toDate != null) {
-                result.append(" (").append(fromDate).append(" to ").append(toDate).append(")");
+            var transfers = transferService.getTransfersByUserId(userId);
+            if (transfers.isEmpty()) {
+                return "No transfers found.";
             }
-            result.append(":\n");
-            result.append("No transfers found in the specified period.");
+
+            var filtered = transfers.stream().filter(t -> {
+                if (fromDate == null || toDate == null) {
+                    return true;
+                }
+                LocalDate date = LocalDate.parse(t.getTransferDate(), formatter);
+                LocalDate from = LocalDate.parse(fromDate, formatter);
+                LocalDate to = LocalDate.parse(toDate, formatter);
+                return (date.isEqual(from) || date.isAfter(from)) && (date.isEqual(to) || date.isBefore(to));
+            }).toList();
+
+            StringBuilder result = new StringBuilder("Transfer History:\n");
+            filtered.forEach(t -> result.append(String.format(
+                    "- %s: $%.2f from %s to %s (%s)\n",
+                    t.getTransferDate(), t.getAmount(), t.getFromAccountName(), t.getToAccountName(), t.getDescription()
+            )));
 
             return result.toString();
         } catch (Exception e) {
@@ -752,7 +783,9 @@ public class FinanceTools {
 
             var transaction = recurring.get();
             String action = paused ? "paused" : "resumed";
-            logger.info("Setting recurring transaction {} to paused={}", recurringId, paused);
+            UpdateRecurringTransactionRequestDTO update = new UpdateRecurringTransactionRequestDTO();
+            update.setIsActive(!paused);
+            recurringTransactionService.updateRecurringTransactionForUser(userId, recurringId, update);
             return String.format("Success: Recurring transaction '%s' has been %s", transaction.getDescription(), action);
         } catch (Exception e) {
             logger.error("Failed to pause/resume recurring transaction", e);
@@ -774,7 +807,7 @@ public class FinanceTools {
                 return "Error: Recurring transaction not found";
             }
 
-            logger.info("Deleting recurring transaction {} for user {}", recurringId, userId);
+            recurringTransactionService.deleteRecurringTransactionForUser(userId, recurringId);
             return "Success: Recurring transaction deleted";
         } catch (Exception e) {
             logger.error("Failed to delete recurring transaction", e);
@@ -887,6 +920,48 @@ public class FinanceTools {
         }
     }
 
+    /** Query financial data using a report type and optional date range/search term filters. */
+    public String queryFinancialDataTool(long userId, String queryType, String startDate, String endDate, String keyword) {
+        try {
+            if (userService.findById(userId).isEmpty()) {
+                return "Error: User not found";
+            }
+
+            String normalizedType = (queryType == null ? "" : queryType.trim().toUpperCase(Locale.ROOT));
+            String effectiveStartDate = normalizeDateOrDefault(startDate, LocalDate.now().withDayOfMonth(1));
+            String effectiveEndDate = normalizeDateOrDefault(endDate, LocalDate.now());
+            String normalizedKeyword = normalizeNullableText(keyword);
+
+            return switch (normalizedType) {
+                case "MONTHLY_SPENDING" -> getMonthlySpending(userId);
+                case "MONTHLY_INCOME" -> getMonthlyIncome(userId);
+                case "FINANCIAL_SUMMARY" -> getFinancialSummary(userId);
+                case "SPENDING_BY_CATEGORY" -> getSpendingByCategory(userId);
+                case "REPORT" -> generateFinancialReportTool(userId, effectiveStartDate, effectiveEndDate);
+                case "TREND" -> getMonthlyTrendAnalysisTool(userId);
+                case "TOP_SPENDING_CATEGORIES" -> getTopSpendingCategories(userId, effectiveStartDate, effectiveEndDate);
+                case "TRANSACTION_SEARCH" -> {
+                    if (normalizedKeyword == null) {
+                        yield searchTransactionsByDateTool(userId, effectiveStartDate, effectiveEndDate);
+                    }
+                    var matches = transactionService.searchTransactions(userId, normalizedKeyword);
+                    if (matches.isEmpty()) {
+                        yield "No transactions found for search term: " + normalizedKeyword;
+                    }
+                    StringBuilder result = new StringBuilder("Transactions matching '" + normalizedKeyword + "':\n");
+                    matches.stream().limit(20).forEach(trans -> result.append(String.format(
+                            "- %s: %s $%.2f (%s)\n",
+                            trans.getDate(), trans.getType(), trans.getAmount(), trans.getDescription())));
+                    yield result.toString();
+                }
+                default -> searchTransactionsByDateTool(userId, effectiveStartDate, effectiveEndDate);
+            };
+        } catch (Exception e) {
+            logger.error("Failed to query financial data", e);
+            return "Error: " + e.getMessage();
+        }
+    }
+
     /** Get financial summary for user including monthly income, expenses, savings rate, and budget status. */
     public String getFinancialSummary(long userId) {
         try {
@@ -900,7 +975,7 @@ public class FinanceTools {
             double incomeAmount = Double.parseDouble(income.replaceAll("[^0-9.]", ""));
             double spendingAmount = Double.parseDouble(spending.replaceAll("[^0-9.]", ""));
             double balance = incomeAmount - spendingAmount;
-            double savingsRate = (balance / incomeAmount) * 100;
+            double savingsRate = incomeAmount > 0 ? (balance / incomeAmount) * 100 : 0.0;
 
             return String.format(
                     "Financial Summary:\n- Monthly Income: $%.2f\n- Monthly Expenses: $%.2f\n- Balance: $%.2f\n- Savings Rate: %.1f%%",
@@ -921,10 +996,27 @@ public class FinanceTools {
                 return "Error: User not found";
             }
 
-            // Implementation depends on your ExpenseService API
-            // This is a placeholder that should be implemented based on your actual service
-            logger.info("Updating expense: {}", expenseId);
+            Double parsedAmount = parseNullableDouble(amount);
+            Long parsedCategoryId = parseNullableLong(categoryId);
+            Long parsedBankAccountId = parseNullableLong(bankAccountId);
+            String parsedDate = normalizeNullableText(date);
+            String parsedDescription = normalizeNullableText(description);
+
+            expenseService.updateExpenseForUser(
+                    userId,
+                    expenseId,
+                    parsedAmount,
+                    parsedCategoryId,
+                    parsedBankAccountId,
+                    parsedDate,
+                    parsedDescription
+            );
+
+            logger.info("Updated expense {} for user {}", expenseId, userId);
             return "Success: Expense updated";
+        } catch (IllegalArgumentException e) {
+            logger.warn("Expense update rejected for user {} and expense {}: {}", userId, expenseId, e.getMessage());
+            return "Error: " + e.getMessage();
         } catch (Exception e) {
             logger.error("Failed to update expense", e);
             return "Error: " + e.getMessage();
@@ -938,13 +1030,80 @@ public class FinanceTools {
                 return "Error: User not found";
             }
 
-            // Implementation depends on your ExpenseService API
-            // This is a placeholder that should be implemented based on your actual service
-            logger.info("Deleting expense: {}", expenseId);
+            expenseService.deleteExpenseForUser(userId, expenseId);
+            logger.info("Deleted expense {} for user {}", expenseId, userId);
             return "Success: Expense deleted";
+        } catch (IllegalArgumentException e) {
+            logger.warn("Expense delete rejected for user {} and expense {}: {}", userId, expenseId, e.getMessage());
+            return "Error: " + e.getMessage();
         } catch (Exception e) {
             logger.error("Failed to delete expense", e);
             return "Error: " + e.getMessage();
         }
+    }
+
+    private String normalizeNullableText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty() || "NONE".equalsIgnoreCase(trimmed) || "NULL".equalsIgnoreCase(trimmed)) {
+            return null;
+        }
+        return trimmed;
+    }
+
+    private Long parseNullableLong(String value) {
+        String normalized = normalizeNullableText(value);
+        if (normalized == null) {
+            return null;
+        }
+        return Long.parseLong(normalized);
+    }
+
+    private Double parseNullableDouble(String value) {
+        String normalized = normalizeNullableText(value);
+        if (normalized == null) {
+            return null;
+        }
+        return Double.parseDouble(normalized);
+    }
+
+    private String normalizeDateOrDefault(String value, LocalDate fallback) {
+        String normalized = normalizeNullableText(value);
+        if (normalized == null) {
+            return fallback.format(formatter);
+        }
+        try {
+            LocalDate.parse(normalized, formatter);
+            return normalized;
+        } catch (Exception ignored) {
+            return fallback.format(formatter);
+        }
+    }
+
+    private String getTopSpendingCategories(long userId, String startDate, String endDate) {
+        var transactions = transactionService.getTransactionsBetweenDates(userId, startDate, endDate);
+        var topCategories = transactions.stream()
+                .filter(t -> "EXPENSE".equalsIgnoreCase(t.getType()))
+                .collect(Collectors.groupingBy(
+                        t -> t.getCategoryName() == null || t.getCategoryName().isBlank() ? "Unknown" : t.getCategoryName(),
+                        Collectors.summingDouble(t -> t.getAmount() == null ? 0.0 : t.getAmount())
+                ))
+                .entrySet()
+                .stream()
+                .sorted(Comparator.comparingDouble((java.util.Map.Entry<String, Double> e) -> e.getValue()).reversed())
+                .limit(5)
+                .toList();
+
+        if (topCategories.isEmpty()) {
+            return "No expense data found for the requested date range.";
+        }
+
+        StringBuilder result = new StringBuilder("Top Spending Categories (" + startDate + " to " + endDate + "):\n");
+        for (var entry : topCategories) {
+            result.append(String.format("- %s: $%.2f\n", entry.getKey(), entry.getValue()));
+        }
+        return result.toString();
     }
 }

@@ -5,11 +5,13 @@ import com.azaxxc.effintrakj.effinTrak.RecurringTransaction.dtos.RecurringTransa
 import com.azaxxc.effintrakj.effinTrak.RecurringTransaction.dtos.UpdateRecurringTransactionRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.RecurringTransaction.service.RecurringTransactionService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.security.AuthenticatedUserResolver;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import com.azaxxc.effintrakj.effinTrak.users.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,19 +23,23 @@ public class RecurringTransactionController {
     private final RecurringTransactionService recurringTransactionService;
     private final UserService userService;
     private final GlobalResponseService globalResponseService;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @Autowired
     public RecurringTransactionController(RecurringTransactionService recurringTransactionService,
                                           UserService userService,
-                                          GlobalResponseService globalResponseService) {
+                                          GlobalResponseService globalResponseService,
+                                          AuthenticatedUserResolver authenticatedUserResolver) {
         this.recurringTransactionService = recurringTransactionService;
         this.userService = userService;
         this.globalResponseService = globalResponseService;
+        this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
     @PostMapping
-    public ResponseEntity<Object> createRecurringTransaction(@Valid @RequestBody RecurringTransactionRequestDTO dto) {
-        Long userId = dto.getUserId();
+    public ResponseEntity<Object> createRecurringTransaction(@Valid @RequestBody RecurringTransactionRequestDTO dto,
+                                                             Authentication authentication) {
+        Long userId = authenticatedUserResolver.resolveRequestedUserId(authentication, dto.getUserId());
         User user = userService.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
 
@@ -42,8 +48,9 @@ public class RecurringTransactionController {
     }
 
     @GetMapping("/user/{userId}")
-    public ResponseEntity<Object> getRecurringTransactionsByUserId(@PathVariable Long userId) {
-        List<RecurringTransactionResponseDTO> transactions = recurringTransactionService.getRecurringTransactionsByUserId(userId);
+    public ResponseEntity<Object> getRecurringTransactionsByUserId(@PathVariable Long userId, Authentication authentication) {
+        Long effectiveUserId = authenticatedUserResolver.resolveRequestedUserId(authentication, userId);
+        List<RecurringTransactionResponseDTO> transactions = recurringTransactionService.getRecurringTransactionsByUserId(effectiveUserId);
         return globalResponseService.success(transactions, "Fetched recurring transactions for user");
     }
 
@@ -54,15 +61,24 @@ public class RecurringTransactionController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Object> updateRecurringTransaction(@PathVariable Long id, @RequestBody UpdateRecurringTransactionRequestDTO dto) {
-        RecurringTransactionResponseDTO updated = recurringTransactionService.updateRecurringTransaction(id, dto);
+    public ResponseEntity<Object> updateRecurringTransaction(@PathVariable Long id,
+                                                             @RequestBody UpdateRecurringTransactionRequestDTO dto,
+                                                             Authentication authentication) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(authentication);
+        RecurringTransactionResponseDTO updated = authenticatedUserId == null
+                ? recurringTransactionService.updateRecurringTransaction(id, dto)
+                : recurringTransactionService.updateRecurringTransactionForUser(authenticatedUserId, id, dto);
         return globalResponseService.success(updated, "Recurring transaction updated successfully");
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Object> deleteRecurringTransaction(@PathVariable Long id) {
-        recurringTransactionService.deleteRecurringTransaction(id);
+    public ResponseEntity<Object> deleteRecurringTransaction(@PathVariable Long id, Authentication authentication) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(authentication);
+        if (authenticatedUserId == null) {
+            recurringTransactionService.deleteRecurringTransaction(id);
+        } else {
+            recurringTransactionService.deleteRecurringTransactionForUser(authenticatedUserId, id);
+        }
         return globalResponseService.success("Recurring transaction deleted successfully");
     }
 }
-

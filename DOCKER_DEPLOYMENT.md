@@ -115,6 +115,11 @@ docker-compose down
 docker-compose down -v
 ```
 
+This now starts frontend too:
+
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8080`
+
 ### Production Setup
 
 ```bash
@@ -164,8 +169,12 @@ docker-compose -f docker-compose.prod.yml logs -f
 # Build image
 docker build -t your-registry/effintrak:latest .
 
+# Frontend image
+docker build -t your-registry/effintrak-frontend:latest ./frontend
+
 # Push to registry
 docker push your-registry/effintrak:latest
+docker push your-registry/effintrak-frontend:latest
 ```
 
 ### Step 2: Update Image in Deployment
@@ -212,6 +221,9 @@ kubectl apply -f k8s/service.yaml
 
 # Create Ingress (optional, for external access)
 kubectl apply -f k8s/ingress.yaml
+
+# Deploy frontend
+kubectl apply -f k8s/frontend.yaml
 ```
 
 ### Step 7: Verify Deployment

@@ -5,12 +5,14 @@ import com.azaxxc.effintrakj.effinTrak.Income.dtos.NewIncomeRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Income.model.Income;
 import com.azaxxc.effintrakj.effinTrak.Income.service.IncomeService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.security.AuthenticatedUserResolver;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import com.azaxxc.effintrakj.effinTrak.users.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -31,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(IncomeController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class IncomeControllerIntegrationTest {
 
     @Autowired
@@ -47,6 +50,9 @@ class IncomeControllerIntegrationTest {
 
     @MockBean
     private GlobalResponseService globalResponseService;
+
+    @MockBean
+    private AuthenticatedUserResolver authenticatedUserResolver;
 
     @MockBean
     private com.azaxxc.effintrakj.effinTrak.globalcomponents.JWTUtil jwtUtil;
@@ -68,6 +74,7 @@ class IncomeControllerIntegrationTest {
         Income savedIncome = new Income();
         savedIncome.setId(1L);
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(1L);
         when(userService.findById(1L)).thenReturn(Optional.of(user));
         when(incomeService.saveIncome(any(NewIncomeRequestDTO.class), any(User.class))).thenReturn(savedIncome);
         when(globalResponseService.success(anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
@@ -88,6 +95,7 @@ class IncomeControllerIntegrationTest {
         IncomeResponse incomeResponse = new IncomeResponse("Test", 1000.0, "Category", "Source", "Note", "Bank", "2024-01-01", 1L);
         Page<IncomeResponse> incomePage = new PageImpl<>(List.of(incomeResponse), pageable, 1);
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(userId);
         when(incomeService.getIncomeByUserId(userId, pageable)).thenReturn(incomePage);
         when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
 
@@ -109,4 +117,3 @@ class IncomeControllerIntegrationTest {
                 .andExpect(status().isNoContent());
     }
 }
-

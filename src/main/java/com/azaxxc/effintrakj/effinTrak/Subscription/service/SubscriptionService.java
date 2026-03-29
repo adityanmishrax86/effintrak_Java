@@ -79,7 +79,16 @@ public class SubscriptionService {
     public SubscriptionResponseDTO updateSubscription(Long id, UpdateSubscriptionRequestDTO dto) {
         Subscription currentSubscription = subscriptionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Subscription not found with id: " + id));
+        return updateSubscription(currentSubscription, dto);
+    }
 
+    public SubscriptionResponseDTO updateSubscriptionForUser(Long userId, Long id, UpdateSubscriptionRequestDTO dto) {
+        Subscription currentSubscription = subscriptionRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new RuntimeException("Subscription not found with id: " + id));
+        return updateSubscription(currentSubscription, dto);
+    }
+
+    private SubscriptionResponseDTO updateSubscription(Subscription currentSubscription, UpdateSubscriptionRequestDTO dto) {
         if (dto.getName() != null) {
             currentSubscription.setName(dto.getName());
         }
@@ -117,12 +126,8 @@ public class SubscriptionService {
             currentSubscription.setIsActive(dto.getIsActive());
         }
 
-        try {
-            Subscription updatedSubscription = subscriptionRepository.save(currentSubscription);
-            return mapper.toSubscriptionResponse(updatedSubscription);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Couldn't update the subscription.");
-        }
+        Subscription updatedSubscription = subscriptionRepository.save(currentSubscription);
+        return mapper.toSubscriptionResponse(updatedSubscription);
     }
 
     public Optional<Subscription> getSubscriptionById(Long id) {
@@ -131,6 +136,12 @@ public class SubscriptionService {
 
     public SubscriptionResponseDTO getSubscriptionResponseById(Long id) {
         Subscription subscription = subscriptionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Subscription not found with id: " + id));
+        return mapper.toSubscriptionResponse(subscription);
+    }
+
+    public SubscriptionResponseDTO getSubscriptionResponseByIdForUser(Long userId, Long id) {
+        Subscription subscription = subscriptionRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new RuntimeException("Subscription not found with id: " + id));
         return mapper.toSubscriptionResponse(subscription);
     }
@@ -155,5 +166,10 @@ public class SubscriptionService {
     public void deleteSubscription(Long id) {
         subscriptionRepository.deleteById(id);
     }
-}
 
+    public void deleteSubscriptionForUser(Long userId, Long id) {
+        Subscription subscription = subscriptionRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new RuntimeException("Subscription not found with id: " + id));
+        subscriptionRepository.delete(subscription);
+    }
+}

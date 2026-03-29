@@ -27,8 +27,8 @@ public class TransactionService {
     }
 
     public List<TransactionResponseDTO> getAllTransactions(Long userId) {
-        List<Income> incomes = incomeRepository.findByUserIdOrderByDateDesc(userId);
-        List<Expense> expenses = expenseRepository.findByUserIdOrderByDateDesc(userId);
+        List<Income> incomes = incomeRepository.findAllByUserIdOrderByDateDesc(userId);
+        List<Expense> expenses = expenseRepository.findAllByUserIdOrderByDateDesc(userId);
 
         List<TransactionResponseDTO> transactions = new ArrayList<>();
         transactions.addAll(incomes.stream().map(this::mapIncomeToDTO).toList());
@@ -43,8 +43,8 @@ public class TransactionService {
         LocalDate start = LocalDate.parse(startDate, formatter);
         LocalDate end = LocalDate.parse(endDate, formatter);
 
-        List<Income> incomes = incomeRepository.findByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
-        List<Expense> expenses = expenseRepository.findByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
+        List<Income> incomes = incomeRepository.findAllByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
+        List<Expense> expenses = expenseRepository.findAllByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
 
         List<TransactionResponseDTO> transactions = new ArrayList<>();
         transactions.addAll(incomes.stream().map(this::mapIncomeToDTO).toList());

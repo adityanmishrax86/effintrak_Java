@@ -94,7 +94,16 @@ public class CreditService {
     public CreditResponseDTO updateCredit(Long id, UpdateCreditRequestDTO dto) {
         Credit currentCredit = creditRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Credit not found with id: " + id));
+        return updateCredit(currentCredit, dto);
+    }
 
+    public CreditResponseDTO updateCreditForUser(Long userId, Long id, UpdateCreditRequestDTO dto) {
+        Credit currentCredit = creditRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new RuntimeException("Credit not found with id: " + id));
+        return updateCredit(currentCredit, dto);
+    }
+
+    private CreditResponseDTO updateCredit(Credit currentCredit, UpdateCreditRequestDTO dto) {
         if (dto.getDescription() != null) {
             currentCredit.setDescription(dto.getDescription());
         }
@@ -130,12 +139,8 @@ public class CreditService {
             currentCredit.setPaid(dto.getPaid());
         }
 
-        try {
-            Credit updatedCredit = creditRepository.save(currentCredit);
-            return mapper.toCreditResponse(updatedCredit);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Couldn't update the credit transaction.");
-        }
+        Credit updatedCredit = creditRepository.save(currentCredit);
+        return mapper.toCreditResponse(updatedCredit);
     }
 
     public Optional<Credit> getCreditById(Long id) {
@@ -144,6 +149,12 @@ public class CreditService {
 
     public CreditResponseDTO getCreditResponseById(Long id) {
         Credit credit = creditRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Credit not found with id: " + id));
+        return mapper.toCreditResponse(credit);
+    }
+
+    public CreditResponseDTO getCreditResponseByIdForUser(Long userId, Long id) {
+        Credit credit = creditRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new RuntimeException("Credit not found with id: " + id));
         return mapper.toCreditResponse(credit);
     }
@@ -176,5 +187,10 @@ public class CreditService {
     public void deleteCredit(Long id) {
         creditRepository.deleteById(id);
     }
-}
 
+    public void deleteCreditForUser(Long userId, Long id) {
+        Credit credit = creditRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new RuntimeException("Credit not found with id: " + id));
+        creditRepository.delete(credit);
+    }
+}

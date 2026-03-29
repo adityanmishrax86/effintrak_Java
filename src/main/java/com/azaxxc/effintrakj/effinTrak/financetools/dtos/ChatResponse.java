@@ -1,6 +1,8 @@
 package com.azaxxc.effintrakj.effinTrak.financetools.dtos;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.ArrayList;
+import java.util.List;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ChatResponse {
@@ -9,6 +11,12 @@ public class ChatResponse {
     private String conversationId;
     private long timestamp;
     private String status;
+    private String operation;
+    private String errorCode;
+    private String model;
+    private String promptProfile;
+    private String promptVersion;
+    private List<String> warnings = new ArrayList<>();
 
     public ChatResponse() {
         this.timestamp = System.currentTimeMillis();
@@ -68,5 +76,52 @@ public class ChatResponse {
     public void setStatus(String status) {
         this.status = status;
     }
-}
 
+    public String getOperation() {
+        return operation;
+    }
+
+    public void setOperation(String operation) {
+        this.operation = operation;
+    }
+
+    public String getErrorCode() {
+        return errorCode;
+    }
+
+    public void setErrorCode(String errorCode) {
+        this.errorCode = errorCode;
+    }
+
+    public String getModel() {
+        return model;
+    }
+
+    public void setModel(String model) {
+        this.model = model;
+    }
+
+    public String getPromptProfile() {
+        return promptProfile;
+    }
+
+    public void setPromptProfile(String promptProfile) {
+        this.promptProfile = promptProfile;
+    }
+
+    public String getPromptVersion() {
+        return promptVersion;
+    }
+
+    public void setPromptVersion(String promptVersion) {
+        this.promptVersion = promptVersion;
+    }
+
+    public List<String> getWarnings() {
+        return warnings;
+    }
+
+    public void setWarnings(List<String> warnings) {
+        this.warnings = warnings;
+    }
+}

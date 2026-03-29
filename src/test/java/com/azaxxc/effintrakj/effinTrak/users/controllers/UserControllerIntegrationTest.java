@@ -6,10 +6,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.Collections;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -18,6 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class UserControllerIntegrationTest {
 
     @Autowired
@@ -39,12 +43,9 @@ class UserControllerIntegrationTest {
     void registerUser_WithValidData_ShouldReturnSuccess() throws Exception {
         // Given
         RegisterRequest registerRequest = new RegisterRequest();
-        registerRequest.setFirstName("John");
-        registerRequest.setLastName("Doe");
+        registerRequest.setUsername("johndoe");
         registerRequest.setEmail("john.doe@example.com");
-        registerRequest.setPhoneNumber("1234567890");
         registerRequest.setPassword("password123");
-        registerRequest.setRole("USER");
 
         // When & Then
         mockMvc.perform(post("/api/v1/users/register")
@@ -95,7 +96,6 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "test@example.com")
     void getUserProfile_WhenAuthenticated_ShouldReturnProfile() throws Exception {
         // Given
         com.azaxxc.effintrakj.effinTrak.users.dto.UserResponseDTO userResponseDTO = 
@@ -110,7 +110,8 @@ class UserControllerIntegrationTest {
                 .thenReturn(java.util.Optional.of(userResponseDTO));
 
         // When & Then
-        mockMvc.perform(get("/api/v1/users/profile"))
+        mockMvc.perform(get("/api/v1/users/profile")
+                        .principal(new UsernamePasswordAuthenticationToken("test@example.com", "N/A", Collections.emptyList())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("test@example.com"))
                 .andExpect(jsonPath("$.firstName").value("John"));
@@ -124,4 +125,3 @@ class UserControllerIntegrationTest {
                 .andExpect(content().string("Logged out Successful"));
     }
 }
-

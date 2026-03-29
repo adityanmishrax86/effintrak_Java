@@ -5,6 +5,7 @@ import com.azaxxc.effintrakj.effinTrak.accounts.dtos.BankAccountResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.accounts.dtos.UpdateBankAccountRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.accounts.model.BankAccount;
 import com.azaxxc.effintrakj.effinTrak.accounts.service.BankAccountService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.security.AuthenticatedUserResolver;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import com.azaxxc.effintrakj.effinTrak.users.service.UserService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
@@ -12,6 +13,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,22 +24,27 @@ public class BankAccountController {
     private final BankAccountService bankAccountService;
     private final UserService userService;
     private final GlobalResponseService globalResponseService;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @Autowired
-    public BankAccountController(BankAccountService bankAccountService, UserService userService, GlobalResponseService globalResponseService) {
+    public BankAccountController(BankAccountService bankAccountService, UserService userService, GlobalResponseService globalResponseService,
+                                 AuthenticatedUserResolver authenticatedUserResolver) {
         this.bankAccountService = bankAccountService;
         this.userService = userService;
         this.globalResponseService = globalResponseService;
+        this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
     @PostMapping
-    public ResponseEntity<Object> createBankAccount(@Valid @RequestBody BankAccountCreateRequestDTO bankAccountCreateRequestDTO) {
+    public ResponseEntity<Object> createBankAccount(@Valid @RequestBody BankAccountCreateRequestDTO bankAccountCreateRequestDTO,
+                                                    Authentication authentication) {
 
-        Long userId = bankAccountCreateRequestDTO.getUserId();
+        Long userId = authenticatedUserResolver.resolveRequestedUserId(authentication, bankAccountCreateRequestDTO.getUserId());
         User user = userService.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
+        bankAccountCreateRequestDTO.setUserId(userId);
 
-        List<BankAccountResponseDTO> banksOfUser = bankAccountService.findByUserId(bankAccountCreateRequestDTO.getUserId());
+        List<BankAccountResponseDTO> banksOfUser = bankAccountService.findByUserId(userId);
 
 
         String newBankName = bankAccountCreateRequestDTO.getBankName().trim();
@@ -55,23 +62,33 @@ public class BankAccountController {
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<Object> getAllBankAccounts(@Valid @PathVariable Long userId) {
-        User user  = userService.findById(userId)
+    public ResponseEntity<Object> getAllBankAccounts(@Valid @PathVariable Long userId, Authentication authentication) {
+        Long effectiveUserId = authenticatedUserResolver.resolveRequestedUserId(authentication, userId);
+        User user  = userService.findById(effectiveUserId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
 
-        List<BankAccountResponseDTO> accounts = bankAccountService.findByUserId(userId);
+        List<BankAccountResponseDTO> accounts = bankAccountService.findByUserId(effectiveUserId);
         return globalResponseService.success(accounts, "Fetched all bank accounts");
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Object> updateBankAccount(@PathVariable Long id, @RequestBody UpdateBankAccountRequestDTO dto) {
-        BankAccountResponseDTO updatedAccount = bankAccountService.updateBankAccount(id, dto.getName(), dto.getBalance());
+    public ResponseEntity<Object> updateBankAccount(@PathVariable Long id, @RequestBody UpdateBankAccountRequestDTO dto,
+                                                    Authentication authentication) {
+        Long effectiveUserId = authenticatedUserResolver.resolveUserId(authentication);
+        BankAccountResponseDTO updatedAccount = effectiveUserId == null
+                ? bankAccountService.updateBankAccount(id, dto.getName(), dto.getBalance())
+                : bankAccountService.updateBankAccountForUser(id, effectiveUserId, dto.getName(), dto.getBalance());
         return globalResponseService.success(updatedAccount, "Bank account updated successfully");
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Object> deleteBankAccount(@PathVariable Long id) {
-        bankAccountService.deleteBankAccount(id);
+    public ResponseEntity<Object> deleteBankAccount(@PathVariable Long id, Authentication authentication) {
+        Long effectiveUserId = authenticatedUserResolver.resolveUserId(authentication);
+        if (effectiveUserId == null) {
+            bankAccountService.deleteBankAccount(id);
+        } else {
+            bankAccountService.deleteBankAccountForUser(id, effectiveUserId);
+        }
         return globalResponseService.success(null, "Bank account deleted successfully");
     }
 }

@@ -6,10 +6,12 @@ import com.azaxxc.effintrakj.effinTrak.Report.dtos.MonthlyTrendDTO;
 import com.azaxxc.effintrakj.effinTrak.Report.dtos.ReportResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.Report.service.ReportService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.security.AuthenticatedUserResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -26,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ReportController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class ReportControllerIntegrationTest {
 
     @Autowired
@@ -41,6 +44,9 @@ class ReportControllerIntegrationTest {
     private GlobalResponseService globalResponseService;
 
     @MockBean
+    private AuthenticatedUserResolver authenticatedUserResolver;
+
+    @MockBean
     private com.azaxxc.effintrakj.effinTrak.globalcomponents.JWTUtil jwtUtil;
 
     @Test
@@ -52,6 +58,7 @@ class ReportControllerIntegrationTest {
         String endDate = "2024-01-31";
         ReportResponseDTO report = new ReportResponseDTO();
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(userId);
         when(reportService.generateReport(anyLong(), anyString(), anyString())).thenReturn(report);
         when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
 
@@ -69,6 +76,7 @@ class ReportControllerIntegrationTest {
         Long userId = 1L;
         MonthlyTrendDTO trend = new MonthlyTrendDTO();
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(userId);
         when(reportService.getMonthlyTrend(anyLong(), any())).thenReturn(List.of(trend));
         when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
 
@@ -84,6 +92,7 @@ class ReportControllerIntegrationTest {
         Long userId = 1L;
         CategoryTrendDTO trend = new CategoryTrendDTO();
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(userId);
         when(reportService.getCategoryTrend(anyLong(), any(), anyString())).thenReturn(List.of(trend));
         when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
 
@@ -101,6 +110,7 @@ class ReportControllerIntegrationTest {
         String endDate = "2024-01-31";
         ComparisonDTO comparison = new ComparisonDTO();
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(userId);
         when(reportService.getComparisonReport(anyLong(), anyString(), anyString())).thenReturn(comparison);
         when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
 
@@ -111,4 +121,3 @@ class ReportControllerIntegrationTest {
                 .andExpect(status().isOk());
     }
 }
-

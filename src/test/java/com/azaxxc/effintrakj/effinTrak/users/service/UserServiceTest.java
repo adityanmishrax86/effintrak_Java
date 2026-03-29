@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
@@ -30,6 +31,9 @@ class UserServiceTest {
     @Mock
     private RefreshTokenService refreshTokenService;
 
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     @InjectMocks
     private UserService userService;
 
@@ -45,12 +49,9 @@ class UserServiceTest {
                 .build();
 
         registerRequest = new RegisterRequest();
-        registerRequest.setFirstName("John");
-        registerRequest.setLastName("Doe");
+        registerRequest.setUsername("johndoe");
         registerRequest.setEmail("john.doe@example.com");
-        registerRequest.setPhoneNumber("1234567890");
         registerRequest.setPassword("password123");
-        registerRequest.setRole("USER");
 
         loginRequestDTO = new LoginRequestDTO();
         loginRequestDTO.setEmail("test@example.com");
@@ -62,6 +63,7 @@ class UserServiceTest {
         // Given
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
         when(userRepository.save(any(User.class))).thenReturn(testUser);
+        when(passwordEncoder.encode(anyString())).thenReturn("encoded-password");
 
         // When
         userService.registerUser(registerRequest);
@@ -87,6 +89,7 @@ class UserServiceTest {
     void authenticateUser_WithValidCredentials_ShouldReturnUser() {
         // Given
         when(userRepository.findByEmail(loginRequestDTO.getEmail())).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(loginRequestDTO.getPassword(), testUser.getPassword())).thenReturn(true);
 
         // When
         Optional<User> result = userService.authenticateUser(loginRequestDTO);
@@ -114,6 +117,7 @@ class UserServiceTest {
         // Given
         loginRequestDTO.setPassword("wrongpassword");
         when(userRepository.findByEmail(loginRequestDTO.getEmail())).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(loginRequestDTO.getPassword(), testUser.getPassword())).thenReturn(false);
 
         // When
         Optional<User> result = userService.authenticateUser(loginRequestDTO);
@@ -178,4 +182,3 @@ class UserServiceTest {
         assertThat(result).isEmpty();
     }
 }
-

@@ -72,8 +72,8 @@ public class DashboardService {
                 .sum();
 
         // Monthly income/expense
-        List<Income> monthlyIncomes = incomeRepository.findByUserIdAndDateBetweenOrderByDateDesc(userId, startOfMonth, endOfMonth);
-        List<Expense> monthlyExpenses = expenseRepository.findByUserIdAndDateBetweenOrderByDateDesc(userId, startOfMonth, endOfMonth);
+        List<Income> monthlyIncomes = incomeRepository.findAllByUserIdAndDateBetweenOrderByDateDesc(userId, startOfMonth, endOfMonth);
+        List<Expense> monthlyExpenses = expenseRepository.findAllByUserIdAndDateBetweenOrderByDateDesc(userId, startOfMonth, endOfMonth);
 
         Double monthlyIncome = monthlyIncomes.stream().mapToDouble(Income::getAmount).sum();
         Double monthlyExpense = monthlyExpenses.stream().mapToDouble(Expense::getAmount).sum();

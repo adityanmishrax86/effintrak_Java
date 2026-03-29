@@ -165,3 +165,16 @@ CREATE TABLE notification_preferences (
     push_notifications BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_notification_preferences_user FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+-- Seed data for categories
+INSERT INTO categories (name) VALUES
+    ('Food'),
+    ('Transport'),
+    ('Utilities'),
+    ('Entertainment'),
+    ('Healthcare'),
+    ('Education'),
+    ('Shopping'),
+    ('Travel'),
+    ('Savings'),
+    ('Other');

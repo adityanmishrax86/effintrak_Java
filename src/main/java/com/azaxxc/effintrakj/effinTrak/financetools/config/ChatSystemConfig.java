@@ -1,5 +1,7 @@
 package com.azaxxc.effintrakj.effinTrak.financetools.config;
 
+import java.time.LocalDate;
+
 /**
  * Configuration class for AI chat system settings.
  * Centralizes all tunable parameters.
@@ -7,7 +9,6 @@ package com.azaxxc.effintrakj.effinTrak.financetools.config;
 public class ChatSystemConfig {
 
     // ==================== AI BEHAVIOR SETTINGS ====================
-    public static final String TODAY_DATE = "2026-02-02";
     public static final String DEFAULT_CONVERSATION_PREFIX = "conv";
 
     // ==================== DEFAULT VALUES FOR EXTRACTION ====================
@@ -24,6 +25,23 @@ public class ChatSystemConfig {
     public static final String OP_GET_MONTHLY_INCOME = "GET_MONTHLY_INCOME";
     public static final String OP_GET_FINANCIAL_SUMMARY = "GET_FINANCIAL_SUMMARY";
     public static final String OP_GET_SPENDING_BY_CATEGORY = "GET_SPENDING_BY_CATEGORY";
+    public static final String OP_CREATE_SAVINGS_GOAL = "CREATE_SAVINGS_GOAL";
+    public static final String OP_GET_SAVINGS_PROGRESS = "GET_SAVINGS_PROGRESS";
+    public static final String OP_ADD_TO_SAVINGS = "ADD_TO_SAVINGS";
+    public static final String OP_WITHDRAW_FROM_SAVINGS = "WITHDRAW_FROM_SAVINGS";
+    public static final String OP_UPDATE_BUDGET = "UPDATE_BUDGET";
+    public static final String OP_ADD_SUBSCRIPTION = "ADD_SUBSCRIPTION";
+    public static final String OP_GET_ACTIVE_SUBSCRIPTIONS = "GET_ACTIVE_SUBSCRIPTIONS";
+    public static final String OP_CANCEL_SUBSCRIPTION = "CANCEL_SUBSCRIPTION";
+    public static final String OP_ADD_CREDIT = "ADD_CREDIT";
+    public static final String OP_GET_ACTIVE_CREDITS = "GET_ACTIVE_CREDITS";
+    public static final String OP_MAKE_CREDIT_PAYMENT = "MAKE_CREDIT_PAYMENT";
+    public static final String OP_TRANSFER_MONEY = "TRANSFER_MONEY";
+    public static final String OP_CREATE_RECURRING_TRANSACTION = "CREATE_RECURRING_TRANSACTION";
+    public static final String OP_GET_ACTIVE_RECURRING_TRANSACTIONS = "GET_ACTIVE_RECURRING_TRANSACTIONS";
+    public static final String OP_PAUSE_RECURRING_TRANSACTION = "PAUSE_RECURRING_TRANSACTION";
+    public static final String OP_DELETE_RECURRING_TRANSACTION = "DELETE_RECURRING_TRANSACTION";
+    public static final String OP_QUERY_FINANCIAL_DATA = "QUERY_FINANCIAL_DATA";
 
     // ==================== FEATURE FLAGS ====================
     public static final boolean ENABLE_UPDATE_EXPENSE = true;
@@ -52,5 +70,8 @@ public class ChatSystemConfig {
     // ==================== PAGINATION ====================
     public static final int DEFAULT_PAGE_SIZE = 1000;
     public static final int CONVERSATIONS_PAGE_SIZE = 10;
-}
 
+    public static String getTodayDate() {
+        return LocalDate.now().toString();
+    }
+}

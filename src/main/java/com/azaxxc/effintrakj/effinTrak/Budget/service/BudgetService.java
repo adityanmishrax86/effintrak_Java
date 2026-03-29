@@ -65,6 +65,16 @@ public class BudgetService {
     public BudgetResponseDTO updateBudget(Long id, UpdateBudgetRequestDTO dto) {
         Budget currentBudget = budgetRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Budget not found with id: " + id));
+        return updateBudget(currentBudget, dto);
+    }
+
+    public BudgetResponseDTO updateBudgetForUser(Long userId, Long id, UpdateBudgetRequestDTO dto) {
+        Budget currentBudget = budgetRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new RuntimeException("Budget not found with id: " + id));
+        return updateBudget(currentBudget, dto);
+    }
+
+    private BudgetResponseDTO updateBudget(Budget currentBudget, UpdateBudgetRequestDTO dto) {
 
         if (dto.getAmount() != null) {
             if (dto.getAmount() <= 0) {
@@ -90,15 +100,17 @@ public class BudgetService {
             currentBudget.setAlertThreshold(dto.getAlertThreshold());
         }
 
-        try {
-            Budget updatedBudget = budgetRepository.save(currentBudget);
-            return mapper.toBudgetResponse(updatedBudget);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Couldn't update the budget.");
-        }
+        Budget updatedBudget = budgetRepository.save(currentBudget);
+        return mapper.toBudgetResponse(updatedBudget);
     }
 
     public void deleteBudget(Long id) {
         budgetRepository.deleteById(id);
+    }
+
+    public void deleteBudgetForUser(Long userId, Long id) {
+        Budget budget = budgetRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new RuntimeException("Budget not found with id: " + id));
+        budgetRepository.delete(budget);
     }
 }

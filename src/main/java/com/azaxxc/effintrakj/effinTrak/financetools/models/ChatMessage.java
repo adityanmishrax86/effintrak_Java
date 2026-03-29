@@ -1,5 +1,6 @@
 package com.azaxxc.effintrakj.effinTrak.financetools.models;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,6 +20,7 @@ public class ChatMessage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @JsonBackReference
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conversation_id", nullable = false)
     private ChatConversation conversation;
@@ -32,6 +34,25 @@ public class ChatMessage {
     @Column(nullable = false)
     private String messageType; // "QUERY", "EXPENSE", "INCOME", "SUMMARY", etc.
 
+    @Column(length = 120)
+    private String operation;
+
+    @Column(length = 120)
+    private String model;
+
+    @Column(length = 60)
+    private String promptProfile;
+
+    @Column(length = 60)
+    private String promptVersion;
+
+    @Column(length = 120)
+    private String errorCode;
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean success = false;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -40,4 +61,3 @@ public class ChatMessage {
         createdAt = LocalDateTime.now();
     }
 }
-

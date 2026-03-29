@@ -3,10 +3,12 @@ package com.azaxxc.effintrakj.effinTrak.Notification.controller;
 import com.azaxxc.effintrakj.effinTrak.Notification.dtos.NotificationResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.Notification.service.NotificationService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.security.AuthenticatedUserResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -23,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(NotificationController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class NotificationControllerIntegrationTest {
 
     @Autowired
@@ -47,6 +50,9 @@ class NotificationControllerIntegrationTest {
     @MockBean  // <-- for JwtAuthFilter (if used)
     private com.azaxxc.effintrakj.effinTrak.users.service.RefreshTokenService refreshTokenService;
 
+    @MockBean
+    private AuthenticatedUserResolver authenticatedUserResolver;
+
     @Test
     @WithMockUser
     void getNotificationsByUserId_ShouldReturnNotifications() throws Exception {
@@ -54,6 +60,7 @@ class NotificationControllerIntegrationTest {
         Long userId = 1L;
         NotificationResponseDTO notification = new NotificationResponseDTO();
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(userId);
         when(notificationService.getNotificationsByUserId(userId)).thenReturn(List.of(notification));
         when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
 
@@ -62,4 +69,3 @@ class NotificationControllerIntegrationTest {
                 .andExpect(status().isOk());
     }
 }
-

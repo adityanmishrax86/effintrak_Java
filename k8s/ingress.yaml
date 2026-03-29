@@ -5,7 +5,6 @@ metadata:
   labels:
     app: effintrak
   annotations:
-    kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
@@ -15,6 +14,7 @@ metadata:
     nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
     nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type"
 spec:
+  ingressClassName: nginx
   tls:
   - hosts:
     - api.effintrak.com
@@ -23,6 +23,13 @@ spec:
   - host: api.effintrak.com
     http:
       paths:
+      - path: /app
+        pathType: Prefix
+        backend:
+          service:
+            name: effintrak-frontend-service
+            port:
+              number: 80
       - path: /
         pathType: Prefix
         backend:

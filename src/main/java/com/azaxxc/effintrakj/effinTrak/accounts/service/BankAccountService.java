@@ -38,6 +38,12 @@ public class BankAccountService {
         bankAccountRepository.deleteById(id);
     }
 
+    public void deleteBankAccountForUser(Long id, Long userId) {
+        BankAccount bankAccount = bankAccountRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new IllegalArgumentException("Bank account not found with id: " + id));
+        bankAccountRepository.delete(bankAccount);
+    }
+
     public List<BankAccountResponseDTO> findByUserId(Long userId) {
 
         return bankAccountRepository.findByuser_id(userId)
@@ -60,5 +66,19 @@ public class BankAccountService {
         BankAccount updatedAccount = bankAccountRepository.save(bankAccount);
         return mapper.toResponseDTO(updatedAccount);
     }
-}
 
+    public BankAccountResponseDTO updateBankAccountForUser(Long id, Long userId, String name, Double balance) {
+        BankAccount bankAccount = bankAccountRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new RuntimeException("Bank account not found with id: " + id));
+
+        if (name != null && !name.trim().isEmpty()) {
+            bankAccount.setName(name.trim());
+        }
+        if (balance != null) {
+            bankAccount.setBalance(balance);
+        }
+
+        BankAccount updatedAccount = bankAccountRepository.save(bankAccount);
+        return mapper.toResponseDTO(updatedAccount);
+    }
+}

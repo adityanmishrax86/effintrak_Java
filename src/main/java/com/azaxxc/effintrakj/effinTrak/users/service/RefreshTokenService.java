@@ -1,11 +1,8 @@
 package com.azaxxc.effintrakj.effinTrak.users.service;
 
-import com.azaxxc.effintrakj.effinTrak.globalcomponents.exceptions.ResourceNotFoundException;
 import com.azaxxc.effintrakj.effinTrak.users.models.RefreshTokens;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import com.azaxxc.effintrakj.effinTrak.users.repo.RefreshTokenRepository;
-import com.azaxxc.effintrakj.effinTrak.users.repo.UserRepository;
-import com.azaxxc.effintrakj.effinTrak.users.repo.UserSummary;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,9 +32,13 @@ public class RefreshTokenService {
     }
 
     public boolean validateRefreshToken(String token) {
-        RefreshTokens refreshToken = refreshTokenRepository.findByToken(token)
-                .orElseThrow(() -> new ResourceNotFoundException("Refresh token not found"));
-        return !refreshToken.getExpiryDate().isAfter(Instant.now());
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        Optional<RefreshTokens> refreshToken = refreshTokenRepository.findByToken(token);
+        return refreshToken
+                .map(rt -> rt.getExpiryDate().isAfter(Instant.now()))
+                .orElse(false);
     }
 
     @Transactional

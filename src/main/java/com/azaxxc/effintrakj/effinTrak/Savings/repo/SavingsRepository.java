@@ -4,8 +4,9 @@ import com.azaxxc.effintrakj.effinTrak.Savings.model.Savings;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface SavingsRepository extends JpaRepository<Savings, Long> {
     List<Savings> findByUserId(Long userId);
+    Optional<Savings> findByIdAndUserId(Long id, Long userId);
 }
-

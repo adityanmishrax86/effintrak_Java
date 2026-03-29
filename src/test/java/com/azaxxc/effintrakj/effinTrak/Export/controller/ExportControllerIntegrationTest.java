@@ -2,10 +2,12 @@ package com.azaxxc.effintrakj.effinTrak.Export.controller;
 
 import com.azaxxc.effintrakj.effinTrak.Export.service.ExportService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.security.AuthenticatedUserResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -21,6 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ExportController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class ExportControllerIntegrationTest {
 
     @Autowired
@@ -36,6 +39,9 @@ class ExportControllerIntegrationTest {
     private GlobalResponseService globalResponseService;
 
     @MockBean
+    private AuthenticatedUserResolver authenticatedUserResolver;
+
+    @MockBean
     private com.azaxxc.effintrakj.effinTrak.globalcomponents.JWTUtil jwtUtil;
 
     @Test
@@ -47,6 +53,7 @@ class ExportControllerIntegrationTest {
         byte[] exportData = "test,data".getBytes();
 
         try {
+            when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(userId);
             when(exportService.exportTransactionsToCSV(anyLong(), anyString(), anyString()))
                     .thenReturn(exportData);
 
@@ -61,4 +68,3 @@ class ExportControllerIntegrationTest {
         }
     }
 }
-

@@ -121,6 +121,50 @@ public class ExpenseService {
 
     }
 
+    public ExpenseResponse updateExpenseForUser(Long userId, Long expenseId, Double amount, Long categoryId,
+                                                Long bankAccountId, String date, String description) {
+        User currentUser = userService.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Invalid User ID Request"));
+        Expense currentExpense = expenseRepository.findByUserIdAndId(currentUser.getId(), expenseId)
+                .orElseThrow(() -> new RuntimeException("Invalid Expense Details"));
+
+        if (amount != null) {
+            if (amount <= 0) {
+                throw new IllegalArgumentException("Expense amount must be greater than zero.");
+            }
+            currentExpense.setAmount(amount);
+        }
+
+        if (description != null && !description.trim().isEmpty()) {
+            currentExpense.setDescription(description.trim());
+        }
+
+        if (date != null && !date.trim().isEmpty()) {
+            LocalDate parsedDate = formatter.parse(date, LocalDate::from);
+            currentExpense.setDate(parsedDate);
+        }
+
+        if (categoryId != null) {
+            Category category = categoryService.getCategories().stream()
+                    .filter(c -> Objects.equals(c.getId(), categoryId))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("No Category found with id:" + categoryId));
+            currentExpense.setCategory(category);
+        }
+
+        if (bankAccountId != null) {
+            BankAccount bankAccount = bankAccountService.getBankAccountById(bankAccountId)
+                    .orElseThrow(() -> new IllegalArgumentException("No Bank Account found with id:" + bankAccountId));
+            if (!Objects.equals(bankAccount.getUser().getId(), userId)) {
+                throw new IllegalArgumentException("Bank account does not belong to user");
+            }
+            currentExpense.setBankAccount(bankAccount);
+        }
+
+        Expense saved = expenseRepository.save(currentExpense);
+        return mapper.toExpenseResponse(saved);
+    }
+
     public Page<ExpenseResponse> getExpensesWithFilters(Long userId, Long categoryId, Double minAmount, Double maxAmount,
                                                          String paymentMethod, Long bankAccountId, String startDate,
                                                          String endDate, Pageable pageable) {
@@ -147,5 +191,10 @@ public class ExpenseService {
     public void deleteExpense(Long id) {
         expenseRepository.deleteById(id);
     }
-}
 
+    public void deleteExpenseForUser(Long userId, Long expenseId) {
+        Expense currentExpense = expenseRepository.findByUserIdAndId(userId, expenseId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid Expense Details"));
+        expenseRepository.delete(currentExpense);
+    }
+}

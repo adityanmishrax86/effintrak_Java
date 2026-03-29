@@ -1,9 +1,14 @@
 package com.azaxxc.effintrakj.effinTrak.financetools;
 
+import com.azaxxc.effintrakj.effinTrak.financetools.config.AIChatProperties;
+import com.azaxxc.effintrakj.effinTrak.financetools.config.AIModelManager;
 import com.azaxxc.effintrakj.effinTrak.financetools.config.ChatSystemConfig;
 import com.azaxxc.effintrakj.effinTrak.financetools.config.PromptRegistry;
+import com.azaxxc.effintrakj.effinTrak.financetools.config.PromptTemplateService;
+import com.azaxxc.effintrakj.effinTrak.financetools.dtos.AIExecutionResult;
 import com.azaxxc.effintrakj.effinTrak.financetools.exceptions.*;
 import com.azaxxc.effintrakj.effinTrak.financetools.guardrails.AIGuardrails;
+import com.azaxxc.effintrakj.effinTrak.financetools.guardrails.AIToolPolicy;
 import com.azaxxc.effintrakj.effinTrak.financetools.models.ChatConversation;
 import com.azaxxc.effintrakj.effinTrak.financetools.services.AIContextService;
 import com.azaxxc.effintrakj.effinTrak.financetools.services.ConversationService;
@@ -15,6 +20,10 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
 @Service
 public class ChatService {
 
@@ -25,15 +34,25 @@ public class ChatService {
     private final ConversationService conversationService;
     private final AIResponseValidator responseValidator;
     private final AIGuardrails guardrails;
+    private final AIToolPolicy toolPolicy;
+    private final AIModelManager modelManager;
+    private final AIChatProperties chatProperties;
+    private final PromptTemplateService promptTemplateService;
 
     public ChatService(ChatModel chatModel, FinanceTools financeTools, AIContextService aiContextService,
                       ConversationService conversationService, AIResponseValidator responseValidator,
-                      AIGuardrails guardrails) {
+                      AIGuardrails guardrails, AIToolPolicy toolPolicy,
+                      AIModelManager modelManager, AIChatProperties chatProperties,
+                      PromptTemplateService promptTemplateService) {
         this.financeTools = financeTools;
         this.aiContextService = aiContextService;
         this.conversationService = conversationService;
         this.responseValidator = responseValidator;
         this.guardrails = guardrails;
+        this.toolPolicy = toolPolicy;
+        this.modelManager = modelManager;
+        this.chatProperties = chatProperties;
+        this.promptTemplateService = promptTemplateService;
         this.chatClient = ChatClient.builder(chatModel).build();
         logger.info("ChatService initialized with ChatModel: {}", chatModel.getClass().getSimpleName());
     }
@@ -46,15 +65,35 @@ public class ChatService {
      * @return Response from the AI with tool execution results
      */
     public String processPrompt(String prompt, long userId, String conversationId) {
+        AIExecutionResult result = processPromptDetailed(prompt, userId, conversationId, null);
+        return result.getMessage();
+    }
+
+    public AIExecutionResult processPromptDetailed(String prompt, long userId, String conversationId, String requestedModel) {
         logger.info("Processing prompt for userId: {}, conversationId: {}", userId, conversationId);
         logger.debug("Prompt content: {}", prompt);
+        AIModelManager.ModelSelection modelSelection = modelManager.resolveModel(requestedModel);
+        String selectedModel = modelSelection.model();
+        ChatConversation conversation = null;
 
         try {
             // Validate user input
             ValidationResult userInputValidation = validateUserInput(prompt, userId);
             if (!userInputValidation.isValid()) {
                 logger.warn("User input validation failed: {}", userInputValidation.getMessage());
-                return "Invalid input: " + userInputValidation.getMessage();
+                AIExecutionResult result = AIExecutionResult.failure(
+                        "Invalid input: " + userInputValidation.getMessage(),
+                        "INVALID_INPUT",
+                        null,
+                        conversationId,
+                        userId,
+                        selectedModel
+                );
+                result.setPromptProfile(promptTemplateService.getPromptProfile());
+                result.setPromptVersion(promptTemplateService.getPromptVersion());
+                result.addWarning(modelSelection.warning());
+                saveAuditIfConversationAvailable(conversation, prompt, result);
+                return result;
             }
 
             // Check rate limits
@@ -66,10 +105,39 @@ public class ChatService {
 
             // Step 0: Load AI context
             logger.info("Step 0: Loading AI context with user's categories and bank accounts...");
-            ChatConversation conversation = conversationService.getOrCreateConversation(userId, conversationId);
+            conversation = conversationService.getOrCreateConversation(userId, conversationId);
             String userContext = aiContextService.buildUserContext(userId);
             if (ChatSystemConfig.LOG_AI_CONTEXT) {
                 logger.debug("User context loaded: {}", userContext);
+            }
+
+            if (isGenericNonFinancialPrompt(prompt)) {
+                String generalReply = generalAssistanceResponse();
+                conversationService.saveMessage(
+                        conversation.getId(),
+                        prompt,
+                        generalReply,
+                        "GENERAL_ASSISTANCE",
+                        "GENERAL_ASSISTANCE",
+                        selectedModel,
+                        promptTemplateService.getPromptProfile(),
+                        promptTemplateService.getPromptVersion(),
+                        null,
+                        true
+                );
+
+                AIExecutionResult response = AIExecutionResult.success(
+                        generalReply,
+                        "GENERAL_ASSISTANCE",
+                        conversationId,
+                        userId,
+                        selectedModel
+                );
+                response.setPromptProfile(promptTemplateService.getPromptProfile());
+                response.setPromptVersion(promptTemplateService.getPromptVersion());
+                response.addWarning(modelSelection.warning());
+                saveAuditIfConversationAvailable(conversation, prompt, response);
+                return response;
             }
 
             // Step 1: Analyze intent
@@ -81,13 +149,55 @@ public class ChatService {
             ValidationResult intentValidation = responseValidator.validateIntent(intentAnalysis);
             if (!intentValidation.isValid()) {
                 logger.warn("Intent validation failed: {}", intentValidation.getMessage());
-                return "Unable to determine a valid operation from your request. " + intentValidation.getMessage();
+                AIExecutionResult result = AIExecutionResult.failure(
+                        "Unable to determine a valid operation from your request. " + intentValidation.getMessage(),
+                        "INVALID_INTENT",
+                        intentAnalysis,
+                        conversationId,
+                        userId,
+                        selectedModel
+                );
+                result.setPromptProfile(promptTemplateService.getPromptProfile());
+                result.setPromptVersion(promptTemplateService.getPromptVersion());
+                result.addWarning(modelSelection.warning());
+                saveAuditIfConversationAvailable(conversation, prompt, result);
+                return result;
             }
 
             // Verify intent consistency
             if (!guardrails.isIntentReasonable(prompt, intentAnalysis)) {
                 logger.warn("Detected unusual intent pattern for user {}: {}", userId, intentAnalysis);
-                return "Your request seems unusual. Could you please clarify what you want to do?";
+                AIExecutionResult result = AIExecutionResult.failure(
+                        "Your request seems unusual. Could you please clarify what you want to do?",
+                        "INTENT_INCONSISTENT",
+                        intentAnalysis,
+                        conversationId,
+                        userId,
+                        selectedModel
+                );
+                result.setPromptProfile(promptTemplateService.getPromptProfile());
+                result.setPromptVersion(promptTemplateService.getPromptVersion());
+                result.addWarning(modelSelection.warning());
+                saveAuditIfConversationAvailable(conversation, prompt, result);
+                return result;
+            }
+
+            AIToolPolicy.PolicyDecision policyDecision = toolPolicy.checkOperationAllowed(intentAnalysis.toUpperCase().trim());
+            if (!policyDecision.allowed()) {
+                logger.warn("Policy blocked operation {} for user {}: {}", intentAnalysis, userId, policyDecision.message());
+                AIExecutionResult result = AIExecutionResult.failure(
+                        policyDecision.message(),
+                        policyDecision.errorCode(),
+                        intentAnalysis,
+                        conversationId,
+                        userId,
+                        selectedModel
+                );
+                result.setPromptProfile(promptTemplateService.getPromptProfile());
+                result.setPromptVersion(promptTemplateService.getPromptVersion());
+                result.addWarning(modelSelection.warning());
+                saveAuditIfConversationAvailable(conversation, prompt, result);
+                return result;
             }
 
             // Step 2: Execute tool based on intent
@@ -97,7 +207,9 @@ public class ChatService {
 
             // Step 3: Format response
             logger.info("Step 3: Formatting response...");
-            String formattedResponse = formatResponse(prompt, result);
+            String formattedResponse = chatProperties.isEnableResponseFormatting()
+                    ? formatResponse(prompt, result)
+                    : result;
             logger.info("Final response: {}", formattedResponse);
 
             // Step 4: Persist conversation
@@ -106,24 +218,88 @@ public class ChatService {
                 conversation.getId(),
                 prompt,
                 formattedResponse,
-                intentAnalysis.toUpperCase().trim()
+                intentAnalysis.toUpperCase().trim(),
+                intentAnalysis.toUpperCase().trim(),
+                selectedModel,
+                promptTemplateService.getPromptProfile(),
+                promptTemplateService.getPromptVersion(),
+                null,
+                true
             );
             logger.info("Conversation persisted successfully");
 
-            return formattedResponse;
+            AIExecutionResult response = AIExecutionResult.success(
+                    formattedResponse,
+                    intentAnalysis.toUpperCase().trim(),
+                    conversationId,
+                    userId,
+                    selectedModel
+            );
+            response.setPromptProfile(promptTemplateService.getPromptProfile());
+            response.setPromptVersion(promptTemplateService.getPromptVersion());
+            response.addWarning(modelSelection.warning());
+            saveAuditIfConversationAvailable(conversation, prompt, response);
+            return response;
 
         } catch (RateLimitExceededException e) {
             logger.warn("Rate limit exceeded: {}", e.getMessage());
-            return "Rate limit exceeded: " + e.getMessage();
+            AIExecutionResult response = AIExecutionResult.failure(
+                    "Rate limit exceeded: " + e.getMessage(),
+                    "RATE_LIMIT_EXCEEDED",
+                    null,
+                    conversationId,
+                    userId,
+                    selectedModel
+            );
+            response.setPromptProfile(promptTemplateService.getPromptProfile());
+            response.setPromptVersion(promptTemplateService.getPromptVersion());
+            response.addWarning(modelSelection.warning());
+            saveAuditIfConversationAvailable(conversation, prompt, response);
+            return response;
         } catch (ParameterValidationException e) {
             logger.error("Parameter validation failed: {}", e.getMessage());
-            return "Parameter validation error: " + e.getMessage();
+            AIExecutionResult response = AIExecutionResult.failure(
+                    "Parameter validation error: " + e.getMessage(),
+                    "PARAMETER_VALIDATION_FAILED",
+                    null,
+                    conversationId,
+                    userId,
+                    selectedModel
+            );
+            response.setPromptProfile(promptTemplateService.getPromptProfile());
+            response.setPromptVersion(promptTemplateService.getPromptVersion());
+            response.addWarning(modelSelection.warning());
+            saveAuditIfConversationAvailable(conversation, prompt, response);
+            return response;
         } catch (InvalidAIResponseException e) {
             logger.error("AI response validation failed: {}", e.getMessage());
-            return "Could not properly process your request. " + e.getMessage();
+            AIExecutionResult response = AIExecutionResult.failure(
+                    "Could not properly process your request. " + e.getMessage(),
+                    "INVALID_AI_RESPONSE",
+                    null,
+                    conversationId,
+                    userId,
+                    selectedModel
+            );
+            response.setPromptProfile(promptTemplateService.getPromptProfile());
+            response.setPromptVersion(promptTemplateService.getPromptVersion());
+            response.addWarning(modelSelection.warning());
+            saveAuditIfConversationAvailable(conversation, prompt, response);
+            return response;
         } catch (HallucinationDetectedException e) {
             logger.error("Hallucination detected: {}", e.getMessage());
-            return "Detected unusual response pattern. Please try again or rephrase your request.";
+            AIExecutionResult response = AIExecutionResult.failure(
+                    "Detected unusual response pattern. Please try again or rephrase your request.",
+                    "HALLUCINATION_DETECTED",
+                    null,
+                    conversationId,
+                    userId,
+                    selectedModel
+            );
+            response.setPromptProfile(promptTemplateService.getPromptProfile());
+            response.setPromptVersion(promptTemplateService.getPromptVersion());
+            response.addWarning(modelSelection.warning());
+            return response;
         } catch (Exception e) {
             logger.error("Error processing prompt", e);
             logger.error("Error type: {}, message: {}", e.getClass().getName(), e.getMessage());
@@ -133,7 +309,19 @@ public class ChatService {
                 e.getClass().getSimpleName(),
                 e.getMessage() != null ? e.getMessage() : "Unknown error"
             );
-            return errorMsg;
+            AIExecutionResult response = AIExecutionResult.failure(
+                    errorMsg,
+                    "UNEXPECTED_ERROR",
+                    null,
+                    conversationId,
+                    userId,
+                    selectedModel
+            );
+            response.setPromptProfile(promptTemplateService.getPromptProfile());
+            response.setPromptVersion(promptTemplateService.getPromptVersion());
+            response.addWarning(modelSelection.warning());
+            saveAuditIfConversationAvailable(conversation, prompt, response);
+            return response;
         }
     }
 
@@ -147,8 +335,8 @@ public class ChatService {
             return ValidationResult.error("Prompt cannot be empty");
         }
 
-        if (prompt.length() > 2000) {
-            return ValidationResult.error("Prompt is too long (maximum 2000 characters)");
+        if (prompt.length() > chatProperties.getMaxPromptLength()) {
+            return ValidationResult.error("Prompt is too long (maximum " + chatProperties.getMaxPromptLength() + " characters)");
         }
 
         ValidationResult userIdValidation = responseValidator.validateUserId(userId);
@@ -165,7 +353,7 @@ public class ChatService {
     private String analyzeIntent(String prompt, String userContext) {
         logger.debug("Calling analyzeIntent with prompt: {}", prompt);
 
-        String intentPrompt = PromptRegistry.getIntentAnalysisPrompt(userContext, prompt);
+        String intentPrompt = promptTemplateService.intentAnalysis(userContext, prompt);
 
         try {
             logger.debug("Sending intent analysis request to ChatClient...");
@@ -227,6 +415,57 @@ public class ChatService {
                 case ChatSystemConfig.OP_GET_SPENDING_BY_CATEGORY:
                     logger.info("Handling GET_SPENDING_BY_CATEGORY");
                     return financeTools.getSpendingByCategory(userId);
+                case ChatSystemConfig.OP_CREATE_SAVINGS_GOAL:
+                    logger.info("Handling CREATE_SAVINGS_GOAL");
+                    return handleCreateSavingsGoal(prompt, userId, userContext);
+                case ChatSystemConfig.OP_GET_SAVINGS_PROGRESS:
+                    logger.info("Handling GET_SAVINGS_PROGRESS");
+                    return financeTools.getSavingsProgress(userId);
+                case ChatSystemConfig.OP_ADD_TO_SAVINGS:
+                    logger.info("Handling ADD_TO_SAVINGS");
+                    return handleAddToSavings(prompt, userId, userContext);
+                case ChatSystemConfig.OP_WITHDRAW_FROM_SAVINGS:
+                    logger.info("Handling WITHDRAW_FROM_SAVINGS");
+                    return handleWithdrawFromSavings(prompt, userId, userContext);
+                case ChatSystemConfig.OP_UPDATE_BUDGET:
+                    logger.info("Handling UPDATE_BUDGET");
+                    return handleUpdateBudget(prompt, userId, userContext);
+                case ChatSystemConfig.OP_ADD_SUBSCRIPTION:
+                    logger.info("Handling ADD_SUBSCRIPTION");
+                    return handleAddSubscription(prompt, userId, userContext);
+                case ChatSystemConfig.OP_GET_ACTIVE_SUBSCRIPTIONS:
+                    logger.info("Handling GET_ACTIVE_SUBSCRIPTIONS");
+                    return financeTools.getActiveSubscriptions(userId);
+                case ChatSystemConfig.OP_CANCEL_SUBSCRIPTION:
+                    logger.info("Handling CANCEL_SUBSCRIPTION");
+                    return handleCancelSubscription(prompt, userId, userContext);
+                case ChatSystemConfig.OP_ADD_CREDIT:
+                    logger.info("Handling ADD_CREDIT");
+                    return handleAddCredit(prompt, userId, userContext);
+                case ChatSystemConfig.OP_GET_ACTIVE_CREDITS:
+                    logger.info("Handling GET_ACTIVE_CREDITS");
+                    return financeTools.getActiveCredits(userId);
+                case ChatSystemConfig.OP_MAKE_CREDIT_PAYMENT:
+                    logger.info("Handling MAKE_CREDIT_PAYMENT");
+                    return handleMakeCreditPayment(prompt, userId, userContext);
+                case ChatSystemConfig.OP_TRANSFER_MONEY:
+                    logger.info("Handling TRANSFER_MONEY");
+                    return handleTransferMoney(prompt, userId, userContext);
+                case ChatSystemConfig.OP_CREATE_RECURRING_TRANSACTION:
+                    logger.info("Handling CREATE_RECURRING_TRANSACTION");
+                    return handleCreateRecurringTransaction(prompt, userId, userContext);
+                case ChatSystemConfig.OP_GET_ACTIVE_RECURRING_TRANSACTIONS:
+                    logger.info("Handling GET_ACTIVE_RECURRING_TRANSACTIONS");
+                    return financeTools.getActiveRecurringTransactions(userId);
+                case ChatSystemConfig.OP_PAUSE_RECURRING_TRANSACTION:
+                    logger.info("Handling PAUSE_RECURRING_TRANSACTION");
+                    return handlePauseRecurring(prompt, userId, userContext);
+                case ChatSystemConfig.OP_DELETE_RECURRING_TRANSACTION:
+                    logger.info("Handling DELETE_RECURRING_TRANSACTION");
+                    return handleDeleteRecurring(prompt, userId, userContext);
+                case ChatSystemConfig.OP_QUERY_FINANCIAL_DATA:
+                    logger.info("Handling QUERY_FINANCIAL_DATA");
+                    return handleQueryFinancialData(prompt, userId, userContext);
                 default:
                     logger.warn("Unknown intent: {}", intent);
                     return "I couldn't determine what you wanted to do. Please try again with more details.";
@@ -246,7 +485,14 @@ public class ChatService {
         logger.debug("Extracting expense parameters from prompt: {}", prompt);
 
         try {
-            String paramExtraction = PromptRegistry.getExpenseParameterExtractionPrompt(userContext, prompt);
+            if (isBatchAddRequest(prompt)) {
+                String batchResult = handleBatchAddExpense(prompt, userId, userContext);
+                if (batchResult != null) {
+                    return batchResult;
+                }
+            }
+
+            String paramExtraction = promptTemplateService.expenseParams(userContext, prompt, ChatSystemConfig.getTodayDate());
 
             logger.debug("Sending parameter extraction request...");
             String params = chatClient.prompt()
@@ -315,7 +561,14 @@ public class ChatService {
         logger.debug("Extracting income parameters from prompt: {}", prompt);
 
         try {
-            String paramExtraction = PromptRegistry.getIncomeParameterExtractionPrompt(userContext, prompt);
+            if (isBatchAddRequest(prompt)) {
+                String batchResult = handleBatchAddIncome(prompt, userId, userContext);
+                if (batchResult != null) {
+                    return batchResult;
+                }
+            }
+
+            String paramExtraction = promptTemplateService.incomeParams(userContext, prompt, ChatSystemConfig.getTodayDate());
 
             logger.debug("Sending income parameter extraction request...");
             String params = chatClient.prompt()
@@ -381,7 +634,7 @@ public class ChatService {
         logger.debug("Attempting to extract update parameters: {}", prompt);
 
         try {
-            String paramExtraction = PromptRegistry.getUpdateExpenseParameterExtractionPrompt(userContext, prompt);
+            String paramExtraction = promptTemplateService.updateExpenseParams(userContext, prompt, ChatSystemConfig.getTodayDate());
 
             String params = chatClient.prompt()
                     .user(paramExtraction)
@@ -449,7 +702,7 @@ public class ChatService {
         logger.debug("Attempting to extract delete parameters: {}", prompt);
 
         try {
-            String paramExtraction = PromptRegistry.getDeleteExpenseParameterExtractionPrompt(userContext, prompt);
+            String paramExtraction = promptTemplateService.deleteExpenseParams(userContext, prompt, ChatSystemConfig.getTodayDate());
 
             String params = chatClient.prompt()
                     .user(paramExtraction)
@@ -504,6 +757,170 @@ public class ChatService {
         }
     }
 
+    private String handleCreateSavingsGoal(String prompt, long userId, String userContext) {
+        String params = chatClient.prompt()
+                .user(promptTemplateService.createSavingsParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .call()
+                .content();
+        String name = extractText(params, "NAME");
+        String description = extractText(params, "DESCRIPTION");
+        double targetAmount = extractNumber(params, "TARGET_AMOUNT");
+        String targetDate = extractDate(params, "TARGET_DATE");
+        String depositFrequency = extractText(params, "DEPOSIT_FREQUENCY");
+        if (depositFrequency.isBlank()) {
+            depositFrequency = "MONTHLY";
+        }
+        return financeTools.createSavingsGoalTool(name, description, targetAmount, targetDate, depositFrequency, userId);
+    }
+
+    private String handleAddToSavings(String prompt, long userId, String userContext) {
+        String params = chatClient.prompt()
+                .user(promptTemplateService.addToSavingsParams(userContext, prompt))
+                .call()
+                .content();
+        long savingsId = extractNumber(params, "SAVINGS_ID").longValue();
+        double amount = extractNumber(params, "DEPOSIT_AMOUNT");
+        return financeTools.addToSavingsTool(savingsId, amount, userId);
+    }
+
+    private String handleWithdrawFromSavings(String prompt, long userId, String userContext) {
+        String params = chatClient.prompt()
+                .user(promptTemplateService.withdrawFromSavingsParams(userContext, prompt))
+                .call()
+                .content();
+        long savingsId = extractNumber(params, "SAVINGS_ID").longValue();
+        double amount = extractNumber(params, "WITHDRAWAL_AMOUNT");
+        return financeTools.withdrawFromSavingsTool(savingsId, amount, userId);
+    }
+
+    private String handleUpdateBudget(String prompt, long userId, String userContext) {
+        String params = chatClient.prompt()
+                .user(promptTemplateService.updateBudgetParams(userContext, prompt))
+                .call()
+                .content();
+        long budgetId = extractNumber(params, "BUDGET_ID").longValue();
+        double amount = extractNumber(params, "AMOUNT");
+        String startDate = extractDate(params, "START_DATE");
+        String endDate = extractDate(params, "END_DATE");
+        return financeTools.updateBudgetTool(budgetId, amount, startDate, endDate, userId);
+    }
+
+    private String handleAddSubscription(String prompt, long userId, String userContext) {
+        String params = chatClient.prompt()
+                .user(promptTemplateService.addSubscriptionParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .call()
+                .content();
+        String name = extractText(params, "NAME");
+        String description = extractText(params, "DESCRIPTION");
+        double price = extractNumber(params, "PRICE");
+        String billingCycle = extractText(params, "BILLING_CYCLE");
+        if (billingCycle.isBlank()) {
+            billingCycle = "monthly";
+        }
+        String startDate = extractDate(params, "START_DATE");
+        return financeTools.addSubscriptionTool(name, description, price, billingCycle, startDate, userId);
+    }
+
+    private String handleCancelSubscription(String prompt, long userId, String userContext) {
+        String params = chatClient.prompt()
+                .user(promptTemplateService.cancelSubscriptionParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .call()
+                .content();
+        long subscriptionId = extractNumber(params, "SUBSCRIPTION_ID").longValue();
+        String endDate = extractDate(params, "END_DATE");
+        return financeTools.cancelSubscriptionTool(subscriptionId, endDate, userId);
+    }
+
+    private String handleAddCredit(String prompt, long userId, String userContext) {
+        String params = chatClient.prompt()
+                .user(promptTemplateService.addCreditParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .call()
+                .content();
+        String description = extractText(params, "DESCRIPTION");
+        double amount = extractNumber(params, "AMOUNT");
+        String type = extractText(params, "TYPE");
+        if (type.isBlank()) {
+            type = "LOAN";
+        }
+        String dueDate = extractDate(params, "DUE_DATE");
+        double interestRate = extractNumber(params, "INTEREST_RATE");
+        return financeTools.addCreditTool(description, amount, type, dueDate, interestRate, "", userId);
+    }
+
+    private String handleMakeCreditPayment(String prompt, long userId, String userContext) {
+        String params = chatClient.prompt()
+                .user(promptTemplateService.creditPaymentParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .call()
+                .content();
+        long creditId = extractNumber(params, "CREDIT_ID").longValue();
+        double paymentAmount = extractNumber(params, "PAYMENT_AMOUNT");
+        String paymentDate = extractDate(params, "PAYMENT_DATE");
+        return financeTools.makePaymentTool(creditId, paymentAmount, paymentDate, userId);
+    }
+
+    private String handleTransferMoney(String prompt, long userId, String userContext) {
+        String params = chatClient.prompt()
+                .user(promptTemplateService.transferParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .call()
+                .content();
+        long fromAccountId = extractNumber(params, "FROM_ACCOUNT_ID").longValue();
+        long toAccountId = extractNumber(params, "TO_ACCOUNT_ID").longValue();
+        double amount = extractNumber(params, "AMOUNT");
+        String description = extractText(params, "DESCRIPTION");
+        String transferDate = extractDate(params, "TRANSFER_DATE");
+        return financeTools.transferMoneyTool(fromAccountId, toAccountId, amount, description, transferDate, userId);
+    }
+
+    private String handleCreateRecurringTransaction(String prompt, long userId, String userContext) {
+        String params = chatClient.prompt()
+                .user(promptTemplateService.createRecurringParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .call()
+                .content();
+        String type = extractText(params, "TYPE");
+        String description = extractText(params, "DESCRIPTION");
+        double amount = extractNumber(params, "AMOUNT");
+        long categoryId = extractNumber(params, "CATEGORY_ID").longValue();
+        String frequency = extractText(params, "FREQUENCY");
+        String startDate = extractDate(params, "START_DATE");
+        String bankAccount = extractText(params, "BANK_ACCOUNT_ID");
+        String paymentMethod = bankAccount.isBlank() ? "" : bankAccount;
+        return financeTools.createRecurringTransactionTool(type, description, amount, categoryId, frequency, startDate, null, paymentMethod, userId);
+    }
+
+    private String handlePauseRecurring(String prompt, long userId, String userContext) {
+        String params = chatClient.prompt()
+                .user(promptTemplateService.pauseRecurringParams(userContext, prompt))
+                .call()
+                .content();
+        long recurringId = extractNumber(params, "RECURRING_ID").longValue();
+        boolean paused = extractBoolean(params, "PAUSED", true);
+        return financeTools.pauseRecurringTool(recurringId, paused, userId);
+    }
+
+    private String handleDeleteRecurring(String prompt, long userId, String userContext) {
+        String params = chatClient.prompt()
+                .user(promptTemplateService.deleteRecurringParams(userContext, prompt))
+                .call()
+                .content();
+        long recurringId = extractNumber(params, "RECURRING_ID").longValue();
+        return financeTools.deleteRecurringTool(recurringId, userId);
+    }
+
+    private String handleQueryFinancialData(String prompt, long userId, String userContext) {
+        String params = chatClient.prompt()
+                .user(promptTemplateService.financialQueryParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .call()
+                .content();
+        String queryType = extractText(params, "QUERY_TYPE");
+        String startDate = extractDate(params, "START_DATE");
+        String endDate = extractDate(params, "END_DATE");
+        String keyword = extractText(params, "KEYWORD");
+        if (queryType.isBlank()) {
+            queryType = "REPORT";
+        }
+        return financeTools.queryFinancialDataTool(userId, queryType, startDate, endDate, keyword);
+    }
+
     /**
      * Format the result nicely for the user (uses centralized prompt)
      */
@@ -517,7 +934,7 @@ public class ChatService {
                 throw new HallucinationDetectedException("Detected unusual response pattern");
             }
 
-            String formatPrompt = PromptRegistry.getResponseFormattingPrompt(originalPrompt, result);
+            String formatPrompt = promptTemplateService.responseFormatter(originalPrompt, result);
 
             logger.debug("Sending format response request...");
             String formattedResponse = chatClient.prompt()
@@ -596,8 +1013,8 @@ public class ChatService {
                 }
             }
         }
-        logger.debug("{} not found, using default: {}", key, ChatSystemConfig.TODAY_DATE);
-        return ChatSystemConfig.TODAY_DATE;
+        logger.debug("{} not found, using default: {}", key, ChatSystemConfig.getTodayDate());
+        return ChatSystemConfig.getTodayDate();
     }
 
     private String extractText(String text, String key) {
@@ -614,5 +1031,169 @@ public class ChatService {
         }
         logger.debug("{} not found", key);
         return "";
+    }
+
+    private boolean extractBoolean(String text, String key, boolean defaultValue) {
+        String value = extractText(text, key);
+        if (value.isBlank()) {
+            return defaultValue;
+        }
+        return value.equalsIgnoreCase("true") || value.equalsIgnoreCase("yes");
+    }
+
+    private void saveAuditIfConversationAvailable(ChatConversation conversation, String prompt, AIExecutionResult result) {
+        if (conversation == null) {
+            return;
+        }
+        conversationService.saveMessage(
+                conversation.getId(),
+                prompt,
+                result.getMessage(),
+                result.getOperation() != null ? result.getOperation() : "ERROR",
+                result.getOperation(),
+                result.getModel(),
+                result.getPromptProfile(),
+                result.getPromptVersion(),
+                result.getErrorCode(),
+                result.isSuccess()
+        );
+    }
+
+    private String handleBatchAddExpense(String prompt, long userId, String userContext) {
+        String batchParams = chatClient.prompt()
+                .user(promptTemplateService.expenseBatchParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .call()
+                .content();
+        List<String> lines = parseBatchLines(batchParams);
+        if (lines.size() <= 1) {
+            return null;
+        }
+
+        List<String> results = new ArrayList<>();
+        int successCount = 0;
+        for (String line : lines) {
+            double amount = extractNumber(line, "AMOUNT");
+            long categoryId = extractNumber(line, "CATEGORY_ID").longValue();
+            long bankAccountId = extractNumber(line, "BANK_ACCOUNT_ID").longValue();
+            String date = extractDate(line, "DATE");
+            String description = extractText(line, "DESCRIPTION");
+
+            String result = financeTools.addExpenseTool(amount, categoryId, bankAccountId, date, description, null, null, userId);
+            results.add(result);
+            if (result.startsWith("Success:")) {
+                successCount++;
+            }
+        }
+        return "Processed " + lines.size() + " expense entries. Success: " + successCount + ", Failed: " + (lines.size() - successCount)
+                + "\n" + String.join("\n", results);
+    }
+
+    private String handleBatchAddIncome(String prompt, long userId, String userContext) {
+        String batchParams = chatClient.prompt()
+                .user(promptTemplateService.incomeBatchParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .call()
+                .content();
+        List<String> lines = parseBatchLines(batchParams);
+        if (lines.size() <= 1) {
+            return null;
+        }
+
+        List<String> results = new ArrayList<>();
+        int successCount = 0;
+        for (String line : lines) {
+            double amount = extractNumber(line, "AMOUNT");
+            String date = extractDate(line, "DATE");
+            String description = extractText(line, "DESCRIPTION");
+            long categoryId = extractNumber(line, "CATEGORY_ID").longValue();
+            long bankAccountId = extractNumber(line, "BANK_ACCOUNT_ID").longValue();
+
+            String result = financeTools.addIncomeTool(amount, description, null, null, bankAccountId, date, categoryId, userId);
+            results.add(result);
+            if (result.startsWith("Success:")) {
+                successCount++;
+            }
+        }
+        return "Processed " + lines.size() + " income entries. Success: " + successCount + ", Failed: " + (lines.size() - successCount)
+                + "\n" + String.join("\n", results);
+    }
+
+    private List<String> parseBatchLines(String batchParams) {
+        List<String> lines = new ArrayList<>();
+        for (String rawLine : batchParams.split("\n")) {
+            String line = rawLine.trim();
+            if (!line.toUpperCase(Locale.ROOT).startsWith("ITEM:")) {
+                continue;
+            }
+            String payload = line.substring("ITEM:".length()).trim();
+            String[] tokens = payload.split(";");
+            StringBuilder normalized = new StringBuilder();
+            for (String token : tokens) {
+                String[] parts = token.split("=", 2);
+                if (parts.length < 2) {
+                    continue;
+                }
+                normalized.append(parts[0].trim().toUpperCase(Locale.ROOT))
+                        .append(": ")
+                        .append(parts[1].trim())
+                        .append("\n");
+            }
+            if (!normalized.isEmpty()) {
+                lines.add(normalized.toString());
+            }
+        }
+        return lines;
+    }
+
+    private boolean isBatchAddRequest(String prompt) {
+        String normalized = prompt == null ? "" : prompt.toLowerCase(Locale.ROOT);
+        if (!(normalized.contains("add") || normalized.contains("record") || normalized.contains("log"))) {
+            return false;
+        }
+        int amountTokenCount = 0;
+        String[] tokens = normalized.split("\\s+");
+        for (String token : tokens) {
+            if (token.matches("\\$?\\d+(\\.\\d{1,2})?")) {
+                amountTokenCount++;
+            }
+        }
+        return amountTokenCount > 1 || normalized.contains(" and ") || normalized.contains(",");
+    }
+
+    private boolean isGenericNonFinancialPrompt(String prompt) {
+        if (prompt == null) {
+            return true;
+        }
+        String normalized = prompt.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return true;
+        }
+        List<String> financeKeywords = List.of(
+                "expense", "income", "spend", "spent", "budget", "saving", "savings", "subscription",
+                "credit", "loan", "transfer", "recurring", "report", "summary", "category", "categories",
+                "transaction", "transactions", "bill", "bills", "monthly", "$"
+        );
+        for (String keyword : financeKeywords) {
+            if (normalized.contains(keyword)) {
+                return false;
+            }
+        }
+        List<String> genericPhrases = List.of(
+                "hi", "hello", "hey", "yo", "good morning", "good afternoon", "good evening",
+                "how are you", "what can you do", "help", "thanks", "thank you", "ok", "okay"
+        );
+        for (String phrase : genericPhrases) {
+            if (normalized.equals(phrase) || normalized.startsWith(phrase + " ")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String generalAssistanceResponse() {
+        return "Hi. I can help manage your finances. Try prompts like: "
+                + "\"add expense 45 for groceries\", "
+                + "\"show my monthly summary\", "
+                + "\"add 20 coffee and 50 groceries\", "
+                + "\"show top spending categories this month\".";
     }
 }

@@ -11,7 +11,5 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: standard
-  # Uncomment for specific storage class:
-  # storageClassName: fast-ssd
+  storageClassName: hostpath
 

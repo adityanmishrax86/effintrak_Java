@@ -1,10 +1,9 @@
 package com.azaxxc.effintrakj.effinTrak;
 
+import com.azaxxc.effintrakj.effinTrak.util.BaseIntegrationTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class EffinTrakApplicationTests {
+class EffinTrakApplicationTests extends BaseIntegrationTest {
 
 	@Test
 	void contextLoads() {

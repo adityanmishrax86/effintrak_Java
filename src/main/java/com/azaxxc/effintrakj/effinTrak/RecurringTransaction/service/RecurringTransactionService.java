@@ -87,7 +87,18 @@ public class RecurringTransactionService {
     public RecurringTransactionResponseDTO updateRecurringTransaction(Long id, UpdateRecurringTransactionRequestDTO dto) {
         RecurringTransaction current = recurringTransactionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Recurring transaction not found with id: " + id));
+        return updateRecurringTransaction(current, dto);
+    }
 
+    public RecurringTransactionResponseDTO updateRecurringTransactionForUser(Long userId, Long id,
+                                                                             UpdateRecurringTransactionRequestDTO dto) {
+        RecurringTransaction current = recurringTransactionRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new RuntimeException("Recurring transaction not found with id: " + id));
+        return updateRecurringTransaction(current, dto);
+    }
+
+    private RecurringTransactionResponseDTO updateRecurringTransaction(RecurringTransaction current,
+                                                                       UpdateRecurringTransactionRequestDTO dto) {
         if (dto.getDescription() != null) {
             current.setDescription(dto.getDescription());
         }
@@ -155,6 +166,12 @@ public class RecurringTransactionService {
         recurringTransactionRepository.deleteById(id);
     }
 
+    public void deleteRecurringTransactionForUser(Long userId, Long id) {
+        RecurringTransaction transaction = recurringTransactionRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new RuntimeException("Recurring transaction not found with id: " + id));
+        recurringTransactionRepository.delete(transaction);
+    }
+
     private LocalDate calculateNextDueDate(LocalDate currentDate, String frequency) {
         return switch (frequency.toUpperCase()) {
             case "DAILY" -> currentDate.plusDays(1);
@@ -165,4 +182,3 @@ public class RecurringTransactionService {
         };
     }
 }
-

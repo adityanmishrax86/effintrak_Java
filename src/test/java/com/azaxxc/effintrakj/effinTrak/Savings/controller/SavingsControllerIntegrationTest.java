@@ -4,12 +4,14 @@ import com.azaxxc.effintrakj.effinTrak.Savings.dtos.SavingsRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Savings.dtos.SavingsResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.Savings.service.SavingsService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.security.AuthenticatedUserResolver;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import com.azaxxc.effintrakj.effinTrak.users.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -26,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(SavingsController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class SavingsControllerIntegrationTest {
 
     @Autowired
@@ -44,6 +47,9 @@ class SavingsControllerIntegrationTest {
     private GlobalResponseService globalResponseService;
 
     @MockBean
+    private AuthenticatedUserResolver authenticatedUserResolver;
+
+    @MockBean
     private com.azaxxc.effintrakj.effinTrak.globalcomponents.JWTUtil jwtUtil;
 
     @Test
@@ -56,6 +62,7 @@ class SavingsControllerIntegrationTest {
         user.setId(1L);
         SavingsResponseDTO response = new SavingsResponseDTO();
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenAnswer(invocation -> invocation.getArgument(1));
         when(userService.findById(1L)).thenReturn(Optional.of(user));
         when(savingsService.saveSavings(any(SavingsRequestDTO.class), any(User.class))).thenReturn(response);
         when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
@@ -74,6 +81,7 @@ class SavingsControllerIntegrationTest {
         Long userId = 1L;
         SavingsResponseDTO savings = new SavingsResponseDTO();
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(userId);
         when(savingsService.getSavingsByUserId(userId)).thenReturn(List.of(savings));
         when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
 
@@ -82,4 +90,3 @@ class SavingsControllerIntegrationTest {
                 .andExpect(status().isOk());
     }
 }
-

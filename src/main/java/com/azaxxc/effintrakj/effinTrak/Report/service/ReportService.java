@@ -31,8 +31,8 @@ public class ReportService {
         LocalDate start = LocalDate.parse(startDate, formatter);
         LocalDate end = LocalDate.parse(endDate, formatter);
 
-        List<Income> incomes = incomeRepository.findByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
-        List<Expense> expenses = expenseRepository.findByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
+        List<Income> incomes = incomeRepository.findAllByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
+        List<Expense> expenses = expenseRepository.findAllByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
 
         Double totalIncome = incomes.stream().mapToDouble(Income::getAmount).sum();
         Double totalExpense = expenses.stream().mapToDouble(Expense::getAmount).sum();
@@ -59,8 +59,8 @@ public class ReportService {
         LocalDate start = LocalDate.of(year, 1, 1);
         LocalDate end = LocalDate.of(year, 12, 31);
 
-        List<Income> incomes = incomeRepository.findByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
-        List<Expense> expenses = expenseRepository.findByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
+        List<Income> incomes = incomeRepository.findAllByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
+        List<Expense> expenses = expenseRepository.findAllByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
 
         Map<String, Double> monthlyIncome = incomes.stream()
                 .collect(Collectors.groupingBy(
@@ -93,7 +93,7 @@ public class ReportService {
             start = end.minusMonths(12); // Default to monthly for 12 months
         }
 
-        List<Expense> expenses = expenseRepository.findByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
+        List<Expense> expenses = expenseRepository.findAllByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
         
         if (categoryId != null) {
             expenses = expenses.stream()
@@ -117,8 +117,8 @@ public class ReportService {
         LocalDate start = LocalDate.parse(startDate, formatter);
         LocalDate end = LocalDate.parse(endDate, formatter);
 
-        List<Income> incomes = incomeRepository.findByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
-        List<Expense> expenses = expenseRepository.findByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
+        List<Income> incomes = incomeRepository.findAllByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
+        List<Expense> expenses = expenseRepository.findAllByUserIdAndDateBetweenOrderByDateDesc(userId, start, end);
 
         Double totalIncome = incomes.stream().mapToDouble(Income::getAmount).sum();
         Double totalExpense = expenses.stream().mapToDouble(Expense::getAmount).sum();

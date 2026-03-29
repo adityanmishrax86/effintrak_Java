@@ -13,7 +13,7 @@ import java.util.Collections;
 
 public class SecurityTestUtils {
 
-    private static final JWTUtil jwtUtil = new JWTUtil();
+    private static final JWTUtil jwtUtil = new JWTUtil("test-jwt-secret", 3600000, 36000000);
 
     /**
      * Creates a mock JWT token for testing
@@ -75,4 +75,3 @@ public class SecurityTestUtils {
         };
     }
 }
-

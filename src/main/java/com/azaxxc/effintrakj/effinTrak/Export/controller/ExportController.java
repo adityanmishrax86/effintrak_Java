@@ -2,9 +2,11 @@ package com.azaxxc.effintrakj.effinTrak.Export.controller;
 
 import com.azaxxc.effintrakj.effinTrak.Export.service.ExportService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.security.AuthenticatedUserResolver;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -15,10 +17,14 @@ public class ExportController {
 
     private final ExportService exportService;
     private final GlobalResponseService globalResponseService;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
-    public ExportController(ExportService exportService, GlobalResponseService globalResponseService) {
+    public ExportController(ExportService exportService,
+            GlobalResponseService globalResponseService,
+            AuthenticatedUserResolver authenticatedUserResolver) {
         this.exportService = exportService;
         this.globalResponseService = globalResponseService;
+        this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
     @GetMapping("/user/{userId}/transactions")
@@ -26,11 +32,13 @@ public class ExportController {
             @PathVariable Long userId,
             @RequestParam String startDate,
             @RequestParam String endDate,
-            @RequestParam(defaultValue = "csv") String format) {
+            @RequestParam(defaultValue = "csv") String format,
+            Authentication authentication) {
+        Long effectiveUserId = authenticatedUserResolver.resolveRequestedUserId(authentication, userId);
         
         try {
             if ("csv".equalsIgnoreCase(format)) {
-                byte[] csvData = exportService.exportTransactionsToCSV(userId, startDate, endDate);
+                byte[] csvData = exportService.exportTransactionsToCSV(effectiveUserId, startDate, endDate);
                 
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.TEXT_PLAIN);
@@ -55,11 +63,13 @@ public class ExportController {
             @PathVariable Long userId,
             @RequestParam String startDate,
             @RequestParam String endDate,
-            @RequestParam(defaultValue = "csv") String format) {
+            @RequestParam(defaultValue = "csv") String format,
+            Authentication authentication) {
+        Long effectiveUserId = authenticatedUserResolver.resolveRequestedUserId(authentication, userId);
         
         try {
             if ("csv".equalsIgnoreCase(format)) {
-                byte[] csvData = exportService.exportReportToCSV(userId, startDate, endDate);
+                byte[] csvData = exportService.exportReportToCSV(effectiveUserId, startDate, endDate);
                 
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.TEXT_PLAIN);
@@ -70,7 +80,7 @@ public class ExportController {
                         .headers(headers)
                         .body(csvData);
             } else if ("text".equalsIgnoreCase(format)) {
-                String textData = exportService.exportReportToText(userId, startDate, endDate);
+                String textData = exportService.exportReportToText(effectiveUserId, startDate, endDate);
                 
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.TEXT_PLAIN);
@@ -90,4 +100,3 @@ public class ExportController {
         }
     }
 }
-

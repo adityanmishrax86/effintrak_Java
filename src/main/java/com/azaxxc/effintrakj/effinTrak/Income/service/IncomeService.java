@@ -145,4 +145,10 @@ public class IncomeService {
         incomeRepository.deleteById(id);
     }
 
+    public void deleteIncomeForUser(Long userId, Long incomeId) {
+        Income currentIncome = incomeRepository.findByUserIdAndId(userId, incomeId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid Income ID"));
+        incomeRepository.delete(currentIncome);
+    }
+
 }

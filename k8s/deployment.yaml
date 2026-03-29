@@ -16,10 +16,36 @@ spec:
       labels:
         app: effintrak
         component: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8080"
     spec:
+      initContainers:
+      - name: wait-for-postgres
+        image: postgres:15-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          until pg_isready -h effintrak-postgres-service -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do
+            echo "Waiting for PostgreSQL to become available..."
+            sleep 2
+          done
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: effintrak-config
+              key: db.name
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: effintrak-secrets
+              key: db-username
       containers:
       - name: app
-        image: effintrak:latest
+        image: effintrakjava-app:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -48,6 +74,20 @@ spec:
               key: jpa.ddl-auto
         - name: SPRING_JPA_SHOW_SQL
           value: "false"
+        - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+          value: "health,info,metrics,prometheus"
+        - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
+          value: "true"
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: effintrak-secrets
+              key: openai-api-key
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: effintrak-secrets
+              key: jwt-secret
         - name: JAVA_OPTS
           value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
         resources:
@@ -59,7 +99,7 @@ spec:
             cpu: "2000m"
         livenessProbe:
           httpGet:
-            path: /actuator/health
+            path: /actuator/health/liveness
             port: 8080
           initialDelaySeconds: 60
           periodSeconds: 30
@@ -67,7 +107,7 @@ spec:
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /actuator/health
+            path: /actuator/health/readiness
             port: 8080
           initialDelaySeconds: 30
           periodSeconds: 10
@@ -144,7 +184,7 @@ spec:
             command:
             - /bin/sh
             - -c
-            - pg_isready -U $(POSTGRES_USER) -d $(POSTGRES_DB)
+            - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
           initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
@@ -154,7 +194,7 @@ spec:
             command:
             - /bin/sh
             - -c
-            - pg_isready -U $(POSTGRES_USER) -d $(POSTGRES_DB)
+            - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
           initialDelaySeconds: 10
           periodSeconds: 5
           timeoutSeconds: 3
@@ -167,4 +207,3 @@ spec:
         configMap:
           name: postgres-init-sql
       restartPolicy: Always
-

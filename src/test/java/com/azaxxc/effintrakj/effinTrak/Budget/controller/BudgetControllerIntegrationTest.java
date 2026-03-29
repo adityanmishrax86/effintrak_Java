@@ -4,10 +4,12 @@ import com.azaxxc.effintrakj.effinTrak.Budget.dtos.BudgetRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Budget.dtos.BudgetResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.Budget.service.BudgetService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.security.AuthenticatedUserResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -23,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(BudgetController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class BudgetControllerIntegrationTest {
 
     @Autowired
@@ -38,6 +41,9 @@ class BudgetControllerIntegrationTest {
     private GlobalResponseService globalResponseService;
 
     @MockBean
+    private AuthenticatedUserResolver authenticatedUserResolver;
+
+    @MockBean
     private com.azaxxc.effintrakj.effinTrak.globalcomponents.JWTUtil jwtUtil;
 
     @Test
@@ -45,8 +51,10 @@ class BudgetControllerIntegrationTest {
     void createBudget_WithValidData_ShouldReturnSuccess() throws Exception {
         // Given
         BudgetRequestDTO dto = new BudgetRequestDTO();
+        dto.setUserId(1L);
         BudgetResponseDTO response = new BudgetResponseDTO();
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenAnswer(invocation -> invocation.getArgument(1));
         when(budgetService.saveBudget(any(BudgetRequestDTO.class))).thenReturn(response);
         when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
 
@@ -64,6 +72,7 @@ class BudgetControllerIntegrationTest {
         Long userId = 1L;
         BudgetResponseDTO budget = new BudgetResponseDTO();
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(userId);
         when(budgetService.getBudgetsByUserId(userId)).thenReturn(List.of(budget));
         when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
 
@@ -72,4 +81,3 @@ class BudgetControllerIntegrationTest {
                 .andExpect(status().isOk());
     }
 }
-

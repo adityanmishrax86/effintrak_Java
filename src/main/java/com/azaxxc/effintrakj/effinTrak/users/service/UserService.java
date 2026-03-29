@@ -1,14 +1,12 @@
 package com.azaxxc.effintrakj.effinTrak.users.service;
 
-import com.azaxxc.effintrakj.effinTrak.users.config.Encoder;
 import com.azaxxc.effintrakj.effinTrak.users.dto.LoginRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.users.dto.RegisterRequest;
 import com.azaxxc.effintrakj.effinTrak.users.dto.UserResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
-import com.azaxxc.effintrakj.effinTrak.users.repo.UserCredentialsSummary;
 import com.azaxxc.effintrakj.effinTrak.users.repo.UserRepository;
-import com.azaxxc.effintrakj.effinTrak.users.repo.UserSummary;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -19,10 +17,13 @@ public class UserService {
 
     public UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository, RefreshTokenService refreshTokenService) {
+    public UserService(UserRepository userRepository, RefreshTokenService refreshTokenService,
+                       PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.refreshTokenService = refreshTokenService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public void registerUser(RegisterRequest userRegisterRequest) {
@@ -33,7 +34,6 @@ public class UserService {
         if(user.isPresent()) {
             throw new RuntimeException("User with email " + userEmail + " already exists");
         } else {
-
             User newUser = mapToUser(userRegisterRequest);
             userRepository.save(newUser);
         }
@@ -41,20 +41,20 @@ public class UserService {
 
     private User mapToUser(RegisterRequest userRegisterRequest) {
         User newUser = new User();
-        Encoder encoder = new Encoder();
-        newUser.setFirstName(userRegisterRequest.getFirstName());
-        newUser.setLastName(userRegisterRequest.getLastName());
+        // Use username as first name, empty last name
+        newUser.setFirstName(userRegisterRequest.getUsername());
+        newUser.setLastName("");
         newUser.setEmail(userRegisterRequest.getEmail());
-        newUser.setPhoneNumber(userRegisterRequest.getPhoneNumber());
-        newUser.setPassword(encoder.passwordEncoder().encode(userRegisterRequest.getPassword()));
-        newUser.setRole(userRegisterRequest.getRole());
+        newUser.setPhoneNumber("");
+        newUser.setPassword(passwordEncoder.encode(userRegisterRequest.getPassword()));
+        // Never trust role from registration payload.
+        newUser.setRole("USER");
         newUser.setActive(true);
 
         return newUser;
     }
 
     public Optional<User> authenticateUser(LoginRequestDTO loginRequestDTO) {
-        Encoder encoder = new Encoder();
         String email = loginRequestDTO.getEmail();
         String password = loginRequestDTO.getPassword();
         Optional<User> user = userRepository.findByEmail(email);
@@ -64,7 +64,7 @@ public class UserService {
         }
         String hashedPassword = user.get().getPassword();
 
-        if(encoder.passwordEncoder().matches(password, hashedPassword)) {
+        if(passwordEncoder.matches(password, hashedPassword)) {
             return user;
         }
         else return Optional.empty();
@@ -77,10 +77,12 @@ public class UserService {
             return Optional.empty();
 
         UserResponseDTO userResponseDTO = new UserResponseDTO();
+        userResponseDTO.setId(user.get().getId());
         userResponseDTO.setFirstName(user.get().getFirstName());
         userResponseDTO.setLastName(user.get().getLastName());
         userResponseDTO.setPhoneNumber(user.get().getPhoneNumber());
         userResponseDTO.setEmail(user.get().getEmail());
+        userResponseDTO.setRole(user.get().getRole());
         userResponseDTO.setActive(user.get().isActive());
 
         return Optional.of(userResponseDTO);
@@ -95,6 +97,10 @@ public class UserService {
     @Cacheable("users")
     public Optional<User> findById(Long userId) {
         return userRepository.findById(userId);
+    }
+
+    public Optional<User> findByEmail(String email) {
+        return userRepository.findByEmail(email);
     }
 
 

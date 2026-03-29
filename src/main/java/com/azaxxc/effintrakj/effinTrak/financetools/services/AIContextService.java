@@ -2,6 +2,8 @@ package com.azaxxc.effintrakj.effinTrak.financetools.services;
 
 import com.azaxxc.effintrakj.effinTrak.accounts.model.BankAccount;
 import com.azaxxc.effintrakj.effinTrak.accounts.repo.BankAccountRepository;
+import com.azaxxc.effintrakj.effinTrak.usersettings.dto.UserSettingsResponse;
+import com.azaxxc.effintrakj.effinTrak.usersettings.service.UserSettingsService;
 import com.azaxxc.effintrakj.effinTrak.Category.model.Category;
 import com.azaxxc.effintrakj.effinTrak.Category.service.CategoryService;
 import org.slf4j.Logger;
@@ -17,10 +19,13 @@ public class AIContextService {
 
     private final CategoryService categoryService;
     private final BankAccountRepository bankAccountRepository;
+    private final UserSettingsService userSettingsService;
 
-    public AIContextService(CategoryService categoryService, BankAccountRepository bankAccountRepository) {
+    public AIContextService(CategoryService categoryService, BankAccountRepository bankAccountRepository,
+                            UserSettingsService userSettingsService) {
         this.categoryService = categoryService;
         this.bankAccountRepository = bankAccountRepository;
+        this.userSettingsService = userSettingsService;
     }
 
     /**
@@ -32,6 +37,7 @@ public class AIContextService {
 
         StringBuilder context = new StringBuilder();
         context.append("\n=== USER FINANCIAL CONTEXT ===\n");
+        addUserPreferenceContext(context, userId);
 
         // Add categories
         context.append("AVAILABLE CATEGORIES:\n");
@@ -70,6 +76,19 @@ public class AIContextService {
 
         logger.debug("AI context built successfully");
         return context.toString();
+    }
+
+    private void addUserPreferenceContext(StringBuilder context, Long userId) {
+        UserSettingsResponse settings = userSettingsService.getEffectiveSettings(userId);
+        context.append("USER PREFERENCES:\n");
+        context.append(String.format("- Currency: %s%n", settings.getCurrencyCode()));
+        context.append(String.format("- Locale: %s%n", settings.getLocale()));
+        context.append(String.format("- Time Zone: %s%n", settings.getTimeZone()));
+        context.append(String.format("- Date Format: %s%n", settings.getDateFormat()));
+        context.append(String.format("- Week Starts On: %s%n", settings.getWeekStartsOn()));
+        context.append(String.format("- AI Persona: %s%n", settings.getAiPersona()));
+        context.append(String.format("- Include Category Hints: %s%n", settings.isIncludeCategoryHints()));
+        context.append(String.format("- Include Proactive Insights: %s%n%n", settings.isIncludeProactiveInsights()));
     }
 
     /**

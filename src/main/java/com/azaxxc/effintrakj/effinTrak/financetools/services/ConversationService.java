@@ -80,7 +80,9 @@ public class ConversationService {
     /**
      * Save a message to a conversation
      */
-    public ChatMessage saveMessage(Long conversationId, String userMessage, String aiResponse, String messageType) {
+    public ChatMessage saveMessage(Long conversationId, String userMessage, String aiResponse, String messageType,
+                                   String operation, String model, String promptProfile, String promptVersion,
+                                   String errorCode, boolean success) {
         logger.debug("Saving message to conversation: {}", conversationId);
 
         ChatConversation conversation = conversationRepository.findById(conversationId)
@@ -91,6 +93,12 @@ public class ConversationService {
                 .userMessage(userMessage)
                 .aiResponse(aiResponse)
                 .messageType(messageType)
+                .operation(operation)
+                .model(model)
+                .promptProfile(promptProfile)
+                .promptVersion(promptVersion)
+                .errorCode(errorCode)
+                .success(success)
                 .build();
 
         ChatMessage saved = messageRepository.save(message);
@@ -109,9 +117,10 @@ public class ConversationService {
     /**
      * Get conversation by ID
      */
-    public Optional<ChatConversation> getConversation(String conversationId) {
+    public Optional<ChatConversation> getConversation(String conversationId, Long userId) {
         logger.debug("Fetching conversation: {}", conversationId);
-        return conversationRepository.findByConversationId(conversationId);
+        return conversationRepository.findByConversationId(conversationId)
+                .filter(conversation -> conversation.getUser().getId().equals(userId));
     }
 
     /**
@@ -151,11 +160,15 @@ public class ConversationService {
     /**
      * Update conversation title and description
      */
-    public ChatConversation updateConversation(String conversationId, String title, String description) {
+    public ChatConversation updateConversation(String conversationId, String title, String description, Long userId) {
         logger.debug("Updating conversation: {}", conversationId);
 
         ChatConversation conversation = conversationRepository.findByConversationId(conversationId)
                 .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + conversationId));
+
+        if (!conversation.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("Conversation does not belong to this user");
+        }
 
         if (title != null && !title.isEmpty()) {
             conversation.setTitle(title);
@@ -177,4 +190,3 @@ public class ConversationService {
         return messages.getContent();
     }
 }
-

@@ -55,13 +55,13 @@ public class NotificationService {
             if (now.isAfter(budget.getStartDate()) && now.isBefore(budget.getEndDate())) {
                 Double totalExpense = 0.0;
                 if (budget.getCategory() != null) {
-                    List<Expense> expenses = expenseRepository.findByUserIdAndDateBetweenOrderByDateDesc(userId,
+                    List<Expense> expenses = expenseRepository.findAllByUserIdAndDateBetweenOrderByDateDesc(userId,
                             budget.getStartDate(), budget.getEndDate());
                     totalExpense = expenses.stream()
                             .filter(e -> e.getCategory() != null && e.getCategory().getId().equals(budget.getCategory().getId()))
                             .mapToDouble(Expense::getAmount).sum();
                 } else {
-                    List<Expense> expenses = expenseRepository.findByUserIdAndDateBetweenOrderByDateDesc(userId,
+                    List<Expense> expenses = expenseRepository.findAllByUserIdAndDateBetweenOrderByDateDesc(userId,
                             budget.getStartDate(), budget.getEndDate());
                     totalExpense = expenses.stream().mapToDouble(Expense::getAmount).sum();
                 }
@@ -119,8 +119,23 @@ public class NotificationService {
     }
 
     @Transactional
+    public void markAsReadForUser(Long userId, Long notificationId) {
+        Notification notification = notificationRepository.findByIdAndUserId(notificationId, userId)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+        notification.setIsRead(true);
+        notificationRepository.save(notification);
+    }
+
+    @Transactional
     public void deleteNotification(Long notificationId) {
         notificationRepository.deleteById(notificationId);
+    }
+
+    @Transactional
+    public void deleteNotificationForUser(Long userId, Long notificationId) {
+        Notification notification = notificationRepository.findByIdAndUserId(notificationId, userId)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+        notificationRepository.delete(notification);
     }
 
     public NotificationPreferencesDTO getPreferences(Long userId) {

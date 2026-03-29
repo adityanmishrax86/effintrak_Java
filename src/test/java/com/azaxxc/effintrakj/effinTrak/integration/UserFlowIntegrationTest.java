@@ -29,12 +29,9 @@ class UserFlowIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         registerRequest = new RegisterRequest();
-        registerRequest.setFirstName("John");
-        registerRequest.setLastName("Doe");
+        registerRequest.setUsername("johndoe");
         registerRequest.setEmail("john.doe@example.com");
-        registerRequest.setPhoneNumber("1234567890");
         registerRequest.setPassword("password123");
-        registerRequest.setRole("USER");
     }
 
     @Test
@@ -48,8 +45,7 @@ class UserFlowIntegrationTest extends BaseIntegrationTest {
         // Then
         assertThat(savedUser).isPresent();
         assertThat(savedUser.get().getEmail()).isEqualTo(registerRequest.getEmail());
-        assertThat(savedUser.get().getFirstName()).isEqualTo(registerRequest.getFirstName());
-        assertThat(savedUser.get().getLastName()).isEqualTo(registerRequest.getLastName());
+        assertThat(savedUser.get().getFirstName()).isEqualTo(registerRequest.getUsername());
 
         // When - Attempt login
         LoginRequestDTO loginRequest = new LoginRequestDTO();
@@ -102,7 +98,7 @@ class UserFlowIntegrationTest extends BaseIntegrationTest {
         // Then
         assertThat(userDetails).isPresent();
         assertThat(userDetails.get().getEmail()).isEqualTo(registerRequest.getEmail());
-        assertThat(userDetails.get().getFirstName()).isEqualTo(registerRequest.getFirstName());
+        assertThat(userDetails.get().getFirstName()).isEqualTo(registerRequest.getUsername());
     }
 }
 

@@ -5,12 +5,14 @@ import com.azaxxc.effintrakj.effinTrak.Expense.dtos.NewExpenseRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Expense.model.Expense;
 import com.azaxxc.effintrakj.effinTrak.Expense.service.ExpenseService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.security.AuthenticatedUserResolver;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import com.azaxxc.effintrakj.effinTrak.users.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -31,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ExpenseController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class ExpenseControllerIntegrationTest {
 
     @Autowired
@@ -47,6 +50,9 @@ class ExpenseControllerIntegrationTest {
 
     @MockBean
     private GlobalResponseService globalResponseService;
+
+    @MockBean
+    private AuthenticatedUserResolver authenticatedUserResolver;
 
     @MockBean
     private com.azaxxc.effintrakj.effinTrak.globalcomponents.JWTUtil jwtUtil;
@@ -68,6 +74,7 @@ class ExpenseControllerIntegrationTest {
         Expense savedExpense = new Expense();
         savedExpense.setId(1L);
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(1L);
         when(userService.findById(1L)).thenReturn(Optional.of(user));
         when(expenseService.saveExpense(any(NewExpenseRequestDTO.class), any(User.class))).thenReturn(savedExpense);
         when(globalResponseService.success(anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
@@ -88,6 +95,7 @@ class ExpenseControllerIntegrationTest {
         ExpenseResponse expenseResponse = new ExpenseResponse("Test", 50.0, "Category", "2024-01-01", "Credit", "Bank", "Merchant", false, 1L);
         Page<ExpenseResponse> expensePage = new PageImpl<>(List.of(expenseResponse), pageable, 1);
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(userId);
         when(expenseService.getExpenseByUserId(userId, pageable)).thenReturn(expensePage);
         when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
 
@@ -109,4 +117,3 @@ class ExpenseControllerIntegrationTest {
                 .andExpect(status().isNoContent());
     }
 }
-

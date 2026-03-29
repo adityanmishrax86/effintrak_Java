@@ -20,9 +20,9 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     Optional<Expense> findByUserIdAndId(Long userId, Long id);
 
-    List<Expense> findByUserIdOrderByDateDesc(Long userId);
+    List<Expense> findAllByUserIdOrderByDateDesc(Long userId);
 
-    List<Expense> findByUserIdAndDateBetweenOrderByDateDesc(Long userId, LocalDate start, LocalDate end);
+    List<Expense> findAllByUserIdAndDateBetweenOrderByDateDesc(Long userId, LocalDate start, LocalDate end);
 
     Page<Expense> findByUserIdAndCategoryIdOrderByDateDesc(Long userId, Long categoryId, Pageable pageable);
 

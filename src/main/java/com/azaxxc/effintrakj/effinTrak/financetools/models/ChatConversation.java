@@ -1,5 +1,6 @@
 package com.azaxxc.effintrakj.effinTrak.financetools.models;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -35,7 +36,9 @@ public class ChatConversation {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @JsonManagedReference
     @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
     private List<ChatMessage> messages = new ArrayList<>();
 
     @Column(nullable = false, updatable = false)

@@ -5,12 +5,14 @@ import com.azaxxc.effintrakj.effinTrak.accounts.dtos.BankAccountResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.accounts.dtos.UpdateBankAccountRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.accounts.service.BankAccountService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.security.AuthenticatedUserResolver;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import com.azaxxc.effintrakj.effinTrak.users.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -28,6 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(BankAccountController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class BankAccountControllerIntegrationTest {
 
     @Autowired
@@ -46,6 +49,9 @@ class BankAccountControllerIntegrationTest {
     private GlobalResponseService globalResponseService;
 
     @MockBean
+    private AuthenticatedUserResolver authenticatedUserResolver;
+
+    @MockBean
     private com.azaxxc.effintrakj.effinTrak.globalcomponents.JWTUtil jwtUtil;
 
     @Test
@@ -59,6 +65,7 @@ class BankAccountControllerIntegrationTest {
         User user = new User();
         user.setId(1L);
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(1L);
         when(userService.findById(1L)).thenReturn(Optional.of(user));
         when(bankAccountService.findByUserId(1L)).thenReturn(Collections.emptyList());
         when(globalResponseService.success(anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
@@ -82,6 +89,7 @@ class BankAccountControllerIntegrationTest {
         User user = new User();
         user.setId(userId);
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(userId);
         when(userService.findById(userId)).thenReturn(Optional.of(user));
         when(bankAccountService.findByUserId(userId)).thenReturn(List.of(accountDTO));
         when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
@@ -127,4 +135,3 @@ class BankAccountControllerIntegrationTest {
                 .andExpect(status().isOk());
     }
 }
-

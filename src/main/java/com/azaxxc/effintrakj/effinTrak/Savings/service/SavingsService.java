@@ -69,7 +69,16 @@ public class SavingsService {
     public SavingsResponseDTO updateSavings(Long id, UpdateSavingsRequestDTO dto) {
         Savings currentSavings = savingsRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Savings not found with id: " + id));
+        return updateSavings(currentSavings, dto);
+    }
 
+    public SavingsResponseDTO updateSavingsForUser(Long userId, Long id, UpdateSavingsRequestDTO dto) {
+        Savings currentSavings = savingsRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new RuntimeException("Savings not found with id: " + id));
+        return updateSavings(currentSavings, dto);
+    }
+
+    private SavingsResponseDTO updateSavings(Savings currentSavings, UpdateSavingsRequestDTO dto) {
         if (dto.getName() != null) {
             currentSavings.setName(dto.getName());
         }
@@ -97,12 +106,8 @@ public class SavingsService {
             currentSavings.setDepositFrequency(dto.getDepositFrequency());
         }
 
-        try {
-            Savings updatedSavings = savingsRepository.save(currentSavings);
-            return mapper.toSavingsResponse(updatedSavings);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Couldn't update the savings.");
-        }
+        Savings updatedSavings = savingsRepository.save(currentSavings);
+        return mapper.toSavingsResponse(updatedSavings);
     }
 
     public Optional<Savings> getSavingsById(Long id) {
@@ -115,8 +120,19 @@ public class SavingsService {
         return mapper.toSavingsResponse(savings);
     }
 
+    public SavingsResponseDTO getSavingsResponseByIdForUser(Long userId, Long id) {
+        Savings savings = savingsRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new RuntimeException("Savings not found with id: " + id));
+        return mapper.toSavingsResponse(savings);
+    }
+
     public void deleteSavings(Long id) {
         savingsRepository.deleteById(id);
     }
-}
 
+    public void deleteSavingsForUser(Long userId, Long id) {
+        Savings savings = savingsRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new RuntimeException("Savings not found with id: " + id));
+        savingsRepository.delete(savings);
+    }
+}

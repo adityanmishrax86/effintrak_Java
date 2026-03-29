@@ -4,12 +4,14 @@ import com.azaxxc.effintrakj.effinTrak.Transfer.dtos.TransferRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Transfer.dtos.TransferResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.Transfer.service.TransferService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.security.AuthenticatedUserResolver;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import com.azaxxc.effintrakj.effinTrak.users.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -27,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(TransferController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class TransferControllerIntegrationTest {
 
     @Autowired
@@ -45,6 +48,9 @@ class TransferControllerIntegrationTest {
     private GlobalResponseService globalResponseService;
 
     @MockBean
+    private AuthenticatedUserResolver authenticatedUserResolver;
+
+    @MockBean
     private com.azaxxc.effintrakj.effinTrak.globalcomponents.JWTUtil jwtUtil;
 
     @Test
@@ -61,6 +67,7 @@ class TransferControllerIntegrationTest {
         user.setId(1L);
         TransferResponseDTO transferResponse = new TransferResponseDTO();
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenAnswer(invocation -> invocation.getArgument(1));
         when(userService.findById(1L)).thenReturn(Optional.of(user));
         when(transferService.createTransfer(any(TransferRequestDTO.class), any(User.class)))
                 .thenReturn(transferResponse);
@@ -80,6 +87,7 @@ class TransferControllerIntegrationTest {
         Long userId = 1L;
         TransferResponseDTO transferResponse = new TransferResponseDTO();
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(userId);
         when(transferService.getTransfersByUserId(userId)).thenReturn(List.of(transferResponse));
         when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
 
@@ -88,4 +96,3 @@ class TransferControllerIntegrationTest {
                 .andExpect(status().isOk());
     }
 }
-

@@ -4,12 +4,14 @@ import com.azaxxc.effintrakj.effinTrak.RecurringTransaction.dtos.RecurringTransa
 import com.azaxxc.effintrakj.effinTrak.RecurringTransaction.dtos.RecurringTransactionResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.RecurringTransaction.service.RecurringTransactionService;
 import com.azaxxc.effintrakj.effinTrak.globalcomponents.GlobalResponseService;
+import com.azaxxc.effintrakj.effinTrak.globalcomponents.security.AuthenticatedUserResolver;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import com.azaxxc.effintrakj.effinTrak.users.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -26,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(RecurringTransactionController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class RecurringTransactionControllerIntegrationTest {
 
     @Autowired
@@ -44,6 +47,9 @@ class RecurringTransactionControllerIntegrationTest {
     private GlobalResponseService globalResponseService;
 
     @MockBean
+    private AuthenticatedUserResolver authenticatedUserResolver;
+
+    @MockBean
     private com.azaxxc.effintrakj.effinTrak.globalcomponents.JWTUtil jwtUtil;
 
     @Test
@@ -56,6 +62,7 @@ class RecurringTransactionControllerIntegrationTest {
         user.setId(1L);
         RecurringTransactionResponseDTO response = new RecurringTransactionResponseDTO();
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenAnswer(invocation -> invocation.getArgument(1));
         when(userService.findById(1L)).thenReturn(Optional.of(user));
         when(recurringTransactionService.saveRecurringTransaction(any(RecurringTransactionRequestDTO.class), any(User.class)))
                 .thenReturn(response);
@@ -75,6 +82,7 @@ class RecurringTransactionControllerIntegrationTest {
         Long userId = 1L;
         RecurringTransactionResponseDTO transaction = new RecurringTransactionResponseDTO();
 
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(userId);
         when(recurringTransactionService.getRecurringTransactionsByUserId(userId)).thenReturn(List.of(transaction));
         when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
 
@@ -83,4 +91,3 @@ class RecurringTransactionControllerIntegrationTest {
                 .andExpect(status().isOk());
     }
 }
-

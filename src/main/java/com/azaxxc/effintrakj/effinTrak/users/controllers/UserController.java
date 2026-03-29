@@ -7,6 +7,7 @@ import com.azaxxc.effintrakj.effinTrak.users.dto.UserResponseDTO;
 import com.azaxxc.effintrakj.effinTrak.users.models.User;
 import com.azaxxc.effintrakj.effinTrak.users.service.RefreshTokenService;
 import com.azaxxc.effintrakj.effinTrak.users.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -31,7 +32,7 @@ public class UserController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<String> registerUser(@RequestBody RegisterRequest userRegisterRequest) {
+    public ResponseEntity<String> registerUser(@Valid @RequestBody RegisterRequest userRegisterRequest) {
 
         userService.registerUser(userRegisterRequest);
 
@@ -40,7 +41,7 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> authenticateUser(@RequestBody LoginRequestDTO loginRequestDTO) {
+    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequestDTO loginRequestDTO) {
         Optional<User> user = userService.authenticateUser(loginRequestDTO);
                 if(user.isEmpty()) {
                     return ResponseEntity.status(401).body("Authentication failed");
@@ -75,20 +76,17 @@ public class UserController {
 
 
     @GetMapping("/profile")
-    public ResponseEntity<Map<String,String>> getUserProfiile(Authentication authentication) {
+    public ResponseEntity<Map<String,Object>> getUserProfiile(Authentication authentication) {
         String email = authentication.getName();
         Optional<UserResponseDTO> userResponseDTO = userService.fetchUsersDetails(email);
         if(userResponseDTO.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.singletonMap("message","User details not found"));
         }
         UserResponseDTO user = userResponseDTO.get();
-        Map<String, String> userProfile = Map.of(
-                "firstName", user.getFirstName(),
-                "lastName", user.getLastName(),
-                "email", user.getEmail(),
-                "phoneNumber", user.getPhoneNumber(),
-                "role", null == user.getRole() ? "BASIC" : user.getRole(),
-                "isActive", String.valueOf(user.isActive())
+        Map<String, Object> userProfile = Map.ofEntries(
+                Map.entry("id", user.getId()),
+                Map.entry("username", user.getFirstName()),
+                Map.entry("email", user.getEmail())
         );
         return ResponseEntity.ok(userProfile);
     }

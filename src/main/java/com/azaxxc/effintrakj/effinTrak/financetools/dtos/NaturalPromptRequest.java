@@ -4,6 +4,7 @@ public class NaturalPromptRequest {
     private String prompt;
     private long userId;
     private String conversationId;
+    private String model;
 
     public NaturalPromptRequest() {}
 
@@ -36,5 +37,12 @@ public class NaturalPromptRequest {
     public void setConversationId(String conversationId) {
         this.conversationId = conversationId;
     }
-}
 
+    public String getModel() {
+        return model;
+    }
+
+    public void setModel(String model) {
+        this.model = model;
+    }
+}
