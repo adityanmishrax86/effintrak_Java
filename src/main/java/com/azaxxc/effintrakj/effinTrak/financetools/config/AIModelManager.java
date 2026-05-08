@@ -35,7 +35,12 @@ public class AIModelManager {
             );
         }
 
-        return ModelSelection.selected(requestedModel);
+        // Runtime currently uses the globally configured ChatModel bean.
+        // Keep API behavior explicit: accept the request but continue with default model.
+        return ModelSelection.withWarning(
+                defaultModel,
+                "Per-request model override is accepted but not yet applied at runtime. Using default model."
+        );
     }
 
     public record ModelSelection(String model, String warning) {

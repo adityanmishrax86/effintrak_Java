@@ -8,6 +8,7 @@ import { ProtectedView } from "@/components/protected-view";
 import { Card } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth";
+import { useUserSettings } from "@/lib/hooks/use-user-settings";
 
 function parseDate(dateStr: string): Date {
   return new Date(dateStr + "T00:00:00Z");
@@ -15,6 +16,7 @@ function parseDate(dateStr: string): Date {
 
 export default function ReportsPage() {
   const profile = useAuthStore((s) => s.profile);
+  const { formatCurrency, formatDate } = useUserSettings();
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
@@ -158,7 +160,7 @@ export default function ReportsPage() {
                     <div>
                       <p className="text-sm font-medium text-zinc-600">Total Income</p>
                       <p className="mt-2 text-3xl font-bold text-emerald-700">
-                        ${analytics.totalIncomes.toFixed(2)}
+                        {formatCurrency(analytics.totalIncomes)}
                       </p>
                     </div>
                     <div className="rounded-lg bg-emerald-100 p-3">
@@ -172,7 +174,7 @@ export default function ReportsPage() {
                     <div>
                       <p className="text-sm font-medium text-zinc-600">Total Expenses</p>
                       <p className="mt-2 text-3xl font-bold text-red-700">
-                        ${analytics.totalExpenses.toFixed(2)}
+                        {formatCurrency(analytics.totalExpenses)}
                       </p>
                     </div>
                     <div className="rounded-lg bg-red-100 p-3">
@@ -190,7 +192,7 @@ export default function ReportsPage() {
                           analytics.netIncome >= 0 ? "text-teal-700" : "text-red-700"
                         }`}
                       >
-                        ${analytics.netIncome.toFixed(2)}
+                        {formatCurrency(analytics.netIncome)}
                       </p>
                     </div>
                     <div
@@ -224,7 +226,7 @@ export default function ReportsPage() {
                           <div key={idx}>
                             <div className="flex items-center justify-between mb-1">
                               <span className="font-medium text-zinc-900">{category}</span>
-                              <span className="text-sm text-zinc-600">${amount.toFixed(2)}</span>
+                              <span className="text-sm text-zinc-600">{formatCurrency(amount)}</span>
                             </div>
                             <div className="h-2 w-full rounded-full bg-zinc-200">
                               <div
@@ -248,12 +250,12 @@ export default function ReportsPage() {
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
                       <p className="text-sm text-blue-900">
-                        <strong>Average Expense:</strong> ${analytics.averageExpense.toFixed(2)} per transaction
+                        <strong>Average Expense:</strong> {formatCurrency(analytics.averageExpense)} per transaction
                       </p>
                     </div>
                     <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
                       <p className="text-sm text-purple-900">
-                        <strong>Avg per Category:</strong> ${analytics.averageExpenseCat.toFixed(2)}
+                        <strong>Avg per Category:</strong> {formatCurrency(analytics.averageExpenseCat)}
                       </p>
                     </div>
                     <div
@@ -298,10 +300,10 @@ export default function ReportsPage() {
                           <div className="flex-1">
                             <p className="font-medium text-zinc-900">{exp.description}</p>
                             <p className="text-xs text-zinc-600">
-                              {exp.date} • {exp.category || "Uncategorized"}
+                              {formatDate(exp.date)} • {exp.category || "Uncategorized"}
                             </p>
                           </div>
-                          <p className="font-semibold text-red-700">${Number(exp.amount || 0).toFixed(2)}</p>
+                          <p className="font-semibold text-red-700">{formatCurrency(exp.amount)}</p>
                         </div>
                       ))}
                     </div>

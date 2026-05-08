@@ -35,7 +35,7 @@ class AIModelManagerTest {
     }
 
     @Test
-    void resolveModel_WhenSupportedOverrideEnabled_UsesRequestedModel() {
+    void resolveModel_WhenSupportedOverrideEnabled_ReturnsDefaultUntilRuntimeSupportsOverride() {
         AIChatProperties properties = new AIChatProperties();
         properties.setDefaultModel("llama-3.3-70b-versatile");
         properties.setAllowModelOverride(true);
@@ -44,8 +44,9 @@ class AIModelManagerTest {
 
         AIModelManager.ModelSelection selection = modelManager.resolveModel("llama3-8b-8192");
 
-        assertEquals("llama3-8b-8192", selection.model());
-        assertNull(selection.warning());
+        assertEquals("llama-3.3-70b-versatile", selection.model());
+        assertNotNull(selection.warning());
+        assertTrue(selection.warning().contains("not yet applied"));
     }
 
     @Test

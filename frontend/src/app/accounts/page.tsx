@@ -6,10 +6,12 @@ import { AppShell } from "@/components/app-shell";
 import { ProtectedView } from "@/components/protected-view";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth";
+import { useUserSettings } from "@/lib/hooks/use-user-settings";
 
 export default function AccountsPage() {
   const queryClient = useQueryClient();
   const profile = useAuthStore((s) => s.profile);
+  const { formatCurrency } = useUserSettings();
 
   const [bankName, setBankName] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -114,7 +116,7 @@ export default function AccountsPage() {
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="font-medium">{account.name}</p>
-                          <p className="text-sm text-zinc-600">Balance: ${Number(account.balance || 0).toFixed(2)}</p>
+                          <p className="text-sm text-zinc-600">Balance: {formatCurrency(account.balance || 0)}</p>
                         </div>
                         <div className="flex gap-2">
                           <button

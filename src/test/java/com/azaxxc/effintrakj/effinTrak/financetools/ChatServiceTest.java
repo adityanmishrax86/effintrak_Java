@@ -23,6 +23,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -110,6 +113,18 @@ class ChatServiceTest {
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.getOperation()).isEqualTo("GENERAL_ASSISTANCE");
         assertThat(result.getMessage()).contains("I can help manage your finances");
+        verify(conversationService, times(1)).saveMessage(
+                eq(100L),
+                eq("hi"),
+                eq(result.getMessage()),
+                eq("GENERAL_ASSISTANCE"),
+                eq("GENERAL_ASSISTANCE"),
+                eq("llama-3.3-70b-versatile"),
+                eq("dev"),
+                eq("test-v1"),
+                eq(null),
+                eq(true)
+        );
     }
 
     @Test

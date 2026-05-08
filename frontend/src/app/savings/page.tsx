@@ -1,26 +1,34 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit2, X } from "lucide-react";
+import { Plus, Target, TrendingUp } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ProtectedView } from "@/components/protected-view";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { useUserSettings } from "@/lib/hooks/use-user-settings";
 
 export default function SavingsPage() {
   const queryClient = useQueryClient();
   const profile = useAuthStore((s) => s.profile);
+  const { formatCurrency, formatDate } = useUserSettings();
+  const [page, setPage] = useState(0);
+  const [showCreate, setShowCreate] = useState(false);
+  const [depositGoalId, setDepositGoalId] = useState<number | null>(null);
+  const [depositAmount, setDepositAmount] = useState("");
 
   const [goalName, setGoalName] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
   const [targetDate, setTargetDate] = useState("");
   const [frequency, setFrequency] = useState("");
-  const [page, setPage] = useState(0);
-  
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editAmount, setEditAmount] = useState("");
-  const [editTargetDate, setEditTargetDate] = useState("");
 
   const savingsQuery = useQuery({
     queryKey: ["savings", profile?.id, page],
@@ -42,192 +50,168 @@ export default function SavingsPage() {
       });
     },
     onSuccess: () => {
-      setGoalName("");
-      setTargetAmount("");
-      setTargetDate("");
-      setFrequency("");
+      setShowCreate(false);
+      setGoalName(""); setTargetAmount(""); setTargetDate(""); setFrequency("");
       queryClient.invalidateQueries({ queryKey: ["savings"] });
+      toast.success("Savings goal created");
     },
+    onError: (e) => toast.error(e.message),
   });
 
-  const updateMutation = useMutation({
+  const depositMutation = useMutation({
     mutationFn: (id: number) =>
-      api.updateSavings(id, { currentAmount: Number(editAmount), targetDate: editTargetDate }),
+      api.updateSavings(id, { currentAmount: Number(depositAmount) }),
     onSuccess: () => {
-      setEditingId(null);
+      setDepositGoalId(null);
+      setDepositAmount("");
       queryClient.invalidateQueries({ queryKey: ["savings"] });
+      toast.success("Deposit recorded");
     },
+    onError: (e) => toast.error(e.message),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.deleteSavings(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["savings"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["savings"] }); toast.success("Goal deleted"); },
   });
 
-  const onCreate = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!goalName.trim() || !targetAmount || Number(targetAmount) <= 0 || !targetDate) {
-      return;
-    }
-    await createMutation.mutateAsync();
-  };
+  const canCreate = goalName.trim() && Number(targetAmount) > 0 && targetDate;
 
   return (
     <ProtectedView>
       <AppShell>
         <div className="space-y-4">
-          <section className="surface-card rounded-xl p-6">
-            <h1 className="text-2xl font-bold">Savings Goals</h1>
-            <p className="mt-1 text-sm text-zinc-600">Set and track savings goals for your future.</p>
-          </section>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Savings Goals</h1>
+              <p className="text-sm text-muted-foreground">Track progress toward your financial goals.</p>
+            </div>
+            <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4 mr-1" /> New Goal</Button>
+          </div>
 
-          <section className="surface-card rounded-xl p-4">
-            <h2 className="font-semibold">Create savings goal</h2>
-            <form onSubmit={onCreate} className="mt-3 grid gap-2 md:grid-cols-2 lg:grid-cols-4">
-              <input
-                value={goalName}
-                onChange={(e) => setGoalName(e.target.value)}
-                placeholder="Goal name"
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-              />
-              <input
-                type="number"
-                value={targetAmount}
-                onChange={(e) => setTargetAmount(e.target.value)}
-                placeholder="Target amount"
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-              />
-              <input
-                type="date"
-                value={targetDate}
-                onChange={(e) => setTargetDate(e.target.value)}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-              />
-              <select
-                value={frequency}
-                onChange={(e) => setFrequency(e.target.value)}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-              >
-                <option value="">Frequency (optional)</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="quarterly">Quarterly</option>
-                <option value="yearly">Yearly</option>
-              </select>
-              <button
-                type="submit"
-                className="rounded-md bg-teal-800 px-4 py-2 text-sm text-white disabled:opacity-60"
-                disabled={createMutation.isPending}
-              >
-                {createMutation.isPending ? "Saving..." : "Create goal"}
-              </button>
-            </form>
-          </section>
+          {/* Goals grid */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {savingsQuery.data?.content?.map((row) => {
+              const current = Number(row.currentAmount || 0);
+              const target = Number(row.targetAmount || 1);
+              const remaining = Math.max(target - current, 0);
+              const pct = Math.min((current / target) * 100, 100);
+              const isComplete = pct >= 100;
+              return (
+                <div key={row.id} className="rounded-lg border bg-card p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-4 w-4 text-muted-foreground" />
+                      <p className="font-semibold">{row.goalName}</p>
+                    </div>
+                    {isComplete && <Badge className="text-[10px]">Complete</Badge>}
+                  </div>
 
-          <section className="surface-card rounded-xl p-4">
-            <h2 className="font-semibold">Savings goals list</h2>
-            <div className="mt-3 space-y-2">
-              {savingsQuery.data?.content?.map((row) => {
-                const progress = row.targetAmount ? (row.currentAmount / row.targetAmount) * 100 : 0;
-                const isEditing = editingId === row.id;
-                return (
-                  <article key={row.id} className="rounded-md border border-zinc-200 bg-white p-3">
-                    {isEditing ? (
-                      <div className="space-y-2">
-                        <input
-                          type="number"
-                          value={editAmount}
-                          onChange={(e) => setEditAmount(e.target.value)}
-                          placeholder="Current amount"
-                          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
-                        />
-                        <input
-                          type="date"
-                          value={editTargetDate}
-                          onChange={(e) => setEditTargetDate(e.target.value)}
-                          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => updateMutation.mutate(row.id)}
-                            className="flex-1 rounded-md bg-teal-800 px-3 py-1.5 text-sm text-white disabled:opacity-60"
-                            disabled={updateMutation.isPending}
-                          >
-                            {updateMutation.isPending ? "Saving..." : "Save"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(null)}
-                            className="rounded-md border border-zinc-300 px-3 py-1.5"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex-1">
-                            <p className="font-medium">{row.goalName}</p>
-                            <p className="text-sm text-zinc-600">
-                              ${Number(row.currentAmount || 0).toFixed(2)} / ${Number(row.targetAmount).toFixed(2)} · Target: {row.targetDate}
-                            </p>
-                            <div className="mt-2 h-2 w-full rounded-full bg-zinc-200">
-                              <div
-                                className="h-2 rounded-full bg-teal-600"
-                                style={{ width: `${Math.min(progress, 100)}%` }}
-                              />
-                            </div>
-                            <p className="mt-1 text-xs text-zinc-600">{Math.round(progress)}% complete</p>
-                          </div>
-                          <div className="flex gap-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingId(row.id);
-                                setEditAmount(String(row.currentAmount));
-                                setEditTargetDate(row.targetDate);
-                              }}
-                              className="rounded-md border border-zinc-300 px-2 py-1"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => deleteMutation.mutate(row.id)}
-                              className="rounded-md border border-red-300 px-2 py-1 text-red-700"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </>
+                  {/* Progress */}
+                  <div className="space-y-1.5">
+                    <div className="h-3 w-full rounded-full bg-muted">
+                      <div
+                        className={`h-3 rounded-full transition-all ${isComplete ? "bg-green-500" : "bg-primary"}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Saved: {formatCurrency(current)}</span>
+                      <span>Goal: {formatCurrency(target)}</span>
+                    </div>
+                    {!isComplete && (
+                      <p className="text-xs text-muted-foreground">
+                        {formatCurrency(remaining)} remaining · Target: {formatDate(row.targetDate)}
+                      </p>
                     )}
-                  </article>
-                );
-              })}
-              {!savingsQuery.data?.content?.length ? <p className="text-sm text-zinc-500">No savings goals found.</p> : null}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-1">
+                    {!isComplete && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => { setDepositGoalId(row.id); setDepositAmount(String(current)); }}
+                      >
+                        <TrendingUp className="h-3 w-3 mr-1" /> Deposit
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() => deleteMutation.mutate(row.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {!savingsQuery.data?.content?.length && (
+            <p className="text-center py-12 text-muted-foreground">No savings goals yet. Create one to start saving.</p>
+          )}
+
+          {savingsQuery.data && savingsQuery.data.totalPages > 1 && (
+            <div className="flex items-center justify-center gap-4">
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>Previous</Button>
+              <span className="text-sm text-muted-foreground">Page {page + 1} of {savingsQuery.data.totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={savingsQuery.data?.last ?? true}>Next</Button>
             </div>
-            <div className="mt-3 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
-              >
-                Previous
-              </button>
-              <span className="text-sm text-zinc-700">Page {page + 1} of {Math.max(1, savingsQuery.data?.totalPages || 1)}</span>
-              <button
-                type="button"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={Boolean(savingsQuery.data?.last)}
-                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-60"
-              >
-                Next
-              </button>
-            </div>
-          </section>
+          )}
+
+          {/* Create Dialog */}
+          <Dialog open={showCreate} onOpenChange={setShowCreate}>
+            <DialogContent>
+              <DialogHeader><DialogTitle>New Savings Goal</DialogTitle></DialogHeader>
+              <div className="grid gap-4 py-2">
+                <div className="grid gap-2"><Label>Goal Name</Label><Input value={goalName} onChange={(e) => setGoalName(e.target.value)} placeholder="e.g. Emergency Fund" autoFocus /></div>
+                <div className="grid gap-2"><Label>Target Amount</Label><Input type="number" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} placeholder="0.00" /></div>
+                <div className="grid gap-2"><Label>Target Date</Label><Input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} /></div>
+                <div className="grid gap-2">
+                  <Label>Frequency (optional)</Label>
+                  <Select value={frequency} onValueChange={setFrequency}>
+                    <SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+                <Button onClick={() => createMutation.mutate()} disabled={!canCreate || createMutation.isPending}>
+                  {createMutation.isPending ? "Creating..." : "Create Goal"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Deposit Dialog */}
+          <Dialog open={!!depositGoalId} onOpenChange={(open) => { if (!open) setDepositGoalId(null); }}>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Update Saved Amount</DialogTitle></DialogHeader>
+              <div className="grid gap-4 py-2">
+                <div className="grid gap-2">
+                  <Label>Current Saved Amount</Label>
+                  <Input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} autoFocus />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDepositGoalId(null)}>Cancel</Button>
+                <Button onClick={() => depositGoalId && depositMutation.mutate(depositGoalId)} disabled={depositMutation.isPending}>
+                  Save
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </AppShell>
     </ProtectedView>

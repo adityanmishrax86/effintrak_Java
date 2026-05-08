@@ -16,7 +16,7 @@ This directory contains Kubernetes manifests for deploying EffinTrak to a Kubern
 
 ## Quick Start
 
-1. **Update secrets** in `secret.yaml` with your production values (`db-password`, `jwt-secret`, `openai-api-key`)
+1. **Update secrets** in `secret.yaml` with your production values (`db-password`, `jwt-secret`, `nvidia-api-key`)
 2. **Update image** in `deployment.yaml` to point to your container registry
 3. **Apply all resources**:
    ```bash

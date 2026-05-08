@@ -1,21 +1,32 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ProtectedView } from "@/components/protected-view";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth";
+import { DataTable, type Column } from "@/components/data-table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { useUserSettings } from "@/lib/hooks/use-user-settings";
 
 export default function TransfersPage() {
   const queryClient = useQueryClient();
   const profile = useAuthStore((s) => s.profile);
+  const { formatCurrency, formatDate } = useUserSettings();
+  const [showCreate, setShowCreate] = useState(false);
 
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [transferDate, setTransferDate] = useState(api.todayString());
-  const [fromAccountId, setFromAccountId] = useState<number>(1);
-  const [toAccountId, setToAccountId] = useState<number>(1);
+  const [fromAccountId, setFromAccountId] = useState<string>("");
+  const [toAccountId, setToAccountId] = useState<string>("");
 
   const accountsQuery = useQuery({
     queryKey: ["accounts-for-transfers", profile?.id],
@@ -37,74 +48,112 @@ export default function TransfersPage() {
     mutationFn: async () => {
       const p = profile ?? (await api.profile());
       return api.createTransfer({
-        amount,
+        amount: Number(amount),
         description: description.trim() || undefined,
         transferDate,
-        fromAccountId,
-        toAccountId,
+        fromAccountId: Number(fromAccountId),
+        toAccountId: Number(toAccountId),
         userId: p.id,
       });
     },
     onSuccess: () => {
-      setAmount(0);
+      setShowCreate(false);
+      setAmount("");
       setDescription("");
       queryClient.invalidateQueries({ queryKey: ["transfers"] });
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      toast.success("Transfer created");
     },
+    onError: (e) => toast.error(e.message),
   });
 
-  const onCreate = async (event: FormEvent) => {
-    event.preventDefault();
-    if (amount <= 0 || fromAccountId === toAccountId) {
-      return;
-    }
-    await createMutation.mutateAsync();
-  };
+  const columns: Column<(typeof rows)[number]>[] = [
+    { key: "transferDate", header: "Date", cell: (row) => formatDate(row.transferDate) },
+    {
+      key: "flow",
+      header: "From → To",
+      cell: (row) => (
+        <span className="flex items-center gap-1 text-sm">
+          {row.fromAccountName} <ArrowRight className="h-3 w-3 text-muted-foreground" /> {row.toAccountName}
+        </span>
+      ),
+    },
+    { key: "amount", header: "Amount", cell: (row) => formatCurrency(row.amount) },
+    { key: "description", header: "Note", cell: (row) => row.description || "—" },
+  ];
+
+  const rows = (transfersQuery.data ?? []).map((t) => ({ ...t, flow: "" }));
+  const canSubmit = Number(amount) > 0 && fromAccountId && toAccountId && fromAccountId !== toAccountId;
 
   return (
     <ProtectedView>
       <AppShell>
         <div className="space-y-4">
-          <section className="surface-card rounded-xl p-6">
-            <h1 className="text-2xl font-bold">Transfers</h1>
-            <p className="mt-1 text-sm text-zinc-600">Move money between your own bank accounts.</p>
-          </section>
-
-          <section className="surface-card rounded-xl p-4">
-            <h2 className="font-semibold">Create transfer</h2>
-            <form onSubmit={onCreate} className="mt-3 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-              <input type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} placeholder="Amount" className="rounded-md border border-zinc-300 px-3 py-2 text-sm" />
-              <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" className="rounded-md border border-zinc-300 px-3 py-2 text-sm" />
-              <input type="date" value={transferDate} onChange={(e) => setTransferDate(e.target.value)} className="rounded-md border border-zinc-300 px-3 py-2 text-sm" />
-              <select value={fromAccountId} onChange={(e) => setFromAccountId(Number(e.target.value))} className="rounded-md border border-zinc-300 px-3 py-2 text-sm">
-                {accountsQuery.data?.map((acc) => (
-                  <option key={acc.id} value={acc.id}>From: {acc.name}</option>
-                ))}
-              </select>
-              <select value={toAccountId} onChange={(e) => setToAccountId(Number(e.target.value))} className="rounded-md border border-zinc-300 px-3 py-2 text-sm">
-                {accountsQuery.data?.map((acc) => (
-                  <option key={acc.id} value={acc.id}>To: {acc.name}</option>
-                ))}
-              </select>
-              <button type="submit" className="rounded-md bg-teal-800 px-4 py-2 text-sm text-white disabled:opacity-60" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Saving..." : "Transfer"}
-              </button>
-            </form>
-            {fromAccountId === toAccountId ? <p className="mt-2 text-xs text-red-700">Source and destination accounts must be different.</p> : null}
-          </section>
-
-          <section className="surface-card rounded-xl p-4">
-            <h2 className="font-semibold">Transfer history</h2>
-            <div className="mt-3 space-y-2">
-              {transfersQuery.data?.map((row) => (
-                <article key={row.id} className="rounded-md border border-zinc-200 bg-white p-3">
-                  <p className="font-medium">${Number(row.amount || 0).toFixed(2)} · {row.transferDate}</p>
-                  <p className="text-sm text-zinc-600">{row.fromAccountName} → {row.toAccountName}</p>
-                  {row.description ? <p className="text-sm text-zinc-600">{row.description}</p> : null}
-                </article>
-              ))}
-              {!transfersQuery.data?.length ? <p className="text-sm text-zinc-500">No transfers found.</p> : null}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Transfers</h1>
+              <p className="text-sm text-muted-foreground">Move money between your accounts.</p>
             </div>
-          </section>
+            <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4 mr-1" /> New Transfer</Button>
+          </div>
+
+          <DataTable columns={columns} data={rows} />
+
+          <Dialog open={showCreate} onOpenChange={setShowCreate}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>New Transfer</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-2">
+                <div className="grid gap-2">
+                  <Label>Amount</Label>
+                  <Input type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" autoFocus />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-2">
+                    <Label>From Account</Label>
+                    <Select value={fromAccountId} onValueChange={setFromAccountId}>
+                      <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectContent>
+                        {accountsQuery.data?.map((acc) => (
+                          <SelectItem key={acc.id} value={String(acc.id)}>
+                            {acc.name} {acc.balance != null && <span className="text-muted-foreground ml-1">({formatCurrency(acc.balance)})</span>}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>To Account</Label>
+                    <Select value={toAccountId} onValueChange={setToAccountId}>
+                      <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectContent>
+                        {accountsQuery.data?.filter((a) => String(a.id) !== fromAccountId).map((acc) => (
+                          <SelectItem key={acc.id} value={String(acc.id)}>
+                            {acc.name} {acc.balance != null && <span className="text-muted-foreground ml-1">({formatCurrency(acc.balance)})</span>}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Date</Label>
+                  <Input type="date" value={transferDate} onChange={(e) => setTransferDate(e.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Note (optional)</Label>
+                  <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Monthly savings" />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+                <Button onClick={() => createMutation.mutate()} disabled={!canSubmit || createMutation.isPending}>
+                  {createMutation.isPending ? "Transferring..." : "Transfer"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </AppShell>
     </ProtectedView>

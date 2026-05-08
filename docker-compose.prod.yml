@@ -35,7 +35,7 @@ services:
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
       MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY}
       # Production JVM Options
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
       # Logging

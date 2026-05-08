@@ -1,22 +1,19 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/lib/auth";
+import { useResolvedSession } from "@/lib/auth";
 
 export default function Home() {
   const router = useRouter();
-  const redirectedRef = useRef(false);
+  const { ready, tokens } = useResolvedSession();
 
   useEffect(() => {
-    // Only redirect once
-    if (redirectedRef.current) return;
-    redirectedRef.current = true;
-
-    // Get current tokens state
-    const tokens = useAuthStore.getState().tokens;
+    if (!ready) {
+      return;
+    }
     router.replace(tokens ? "/dashboard" : "/login");
-  }, [router]);
+  }, [ready, tokens, router]);
 
   return <div className="p-8 text-sm text-zinc-700">Starting EffinTrak web app...</div>;
 }

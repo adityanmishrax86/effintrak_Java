@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { api } from "@/lib/api";
+import { useResolvedSession } from "@/lib/auth";
 
 const schema = z.object({
   email: z.string().email("Provide a valid email"),
@@ -17,8 +18,15 @@ type FormValues = z.infer<typeof schema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const { ready, tokens } = useResolvedSession();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (ready && tokens) {
+      router.replace("/dashboard");
+    }
+  }, [ready, tokens, router]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -70,7 +78,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !ready}
             className="w-full rounded-md bg-teal-800 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
             {submitting ? "Signing in..." : "Sign in"}

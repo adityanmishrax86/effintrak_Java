@@ -14,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -83,11 +84,15 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.singletonMap("message","User details not found"));
         }
         UserResponseDTO user = userResponseDTO.get();
-        Map<String, Object> userProfile = Map.ofEntries(
-                Map.entry("id", user.getId()),
-                Map.entry("username", user.getFirstName()),
-                Map.entry("email", user.getEmail())
-        );
+        // Use a mutable map so nullable fields do not trigger runtime exceptions.
+        Map<String, Object> userProfile = new LinkedHashMap<>();
+        userProfile.put("id", user.getId());
+        userProfile.put("username", user.getFirstName());
+        userProfile.put("firstName", user.getFirstName());
+        userProfile.put("lastName", user.getLastName());
+        userProfile.put("email", user.getEmail());
+        userProfile.put("phoneNumber", user.getPhoneNumber());
+        userProfile.put("active", user.isActive());
         return ResponseEntity.ok(userProfile);
     }
 

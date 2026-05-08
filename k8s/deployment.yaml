@@ -78,11 +78,11 @@ spec:
           value: "health,info,metrics,prometheus"
         - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
           value: "true"
-        - name: OPENAI_API_KEY
+        - name: NVIDIA_API_KEY
           valueFrom:
             secretKeyRef:
               name: effintrak-secrets
-              key: openai-api-key
+              key: nvidia-api-key
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:

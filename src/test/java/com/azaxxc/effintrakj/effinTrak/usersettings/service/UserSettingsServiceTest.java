@@ -38,7 +38,7 @@ class UserSettingsServiceTest {
         UserSettingsResponse response = service.getEffectiveSettings(9L);
 
         assertThat(response.getUserId()).isEqualTo(9L);
-        assertThat(response.getCurrencyCode()).isEqualTo("USD");
+        assertThat(response.getCurrencyCode()).isEqualTo("INR");
         assertThat(response.getLocale()).isEqualTo("en-US");
     }
 

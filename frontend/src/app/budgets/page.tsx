@@ -1,28 +1,34 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Plus, X, Edit2 } from "lucide-react";
+import { Trash2, Plus, Edit2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ProtectedView } from "@/components/protected-view";
-import { Button, Card, Input, Select } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { useUserSettings } from "@/lib/hooks/use-user-settings";
 
 export default function BudgetsPage() {
   const queryClient = useQueryClient();
   const profile = useAuthStore((s) => s.profile);
+  const { formatCurrency } = useUserSettings();
+  const [page, setPage] = useState(0);
+  const [showCreate, setShowCreate] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<{ id: number; amount: string; endDate: string } | null>(null);
 
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [page, setPage] = useState(0);
-  
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editAmount, setEditAmount] = useState("");
-  const [editEndDate, setEditEndDate] = useState("");
 
   const categoriesQuery = useQuery({
     queryKey: ["categories"],
@@ -50,251 +56,143 @@ export default function BudgetsPage() {
       });
     },
     onSuccess: () => {
-      setName("");
-      setAmount("");
-      setStartDate("");
-      setEndDate("");
-      setCategoryId("");
+      setShowCreate(false);
+      setName(""); setAmount(""); setStartDate(""); setEndDate(""); setCategoryId("");
       queryClient.invalidateQueries({ queryKey: ["budgets"] });
+      toast.success("Budget created");
     },
+    onError: (e) => toast.error(e.message),
   });
 
   const updateMutation = useMutation({
-    mutationFn: (id: number) =>
-      api.updateBudget(id, {
-        amount: Number(editAmount),
-        endDate: editEndDate,
-      }),
+    mutationFn: () => api.updateBudget(editingBudget!.id, { amount: Number(editingBudget!.amount), endDate: editingBudget!.endDate }),
     onSuccess: () => {
-      setEditingId(null);
+      setEditingBudget(null);
       queryClient.invalidateQueries({ queryKey: ["budgets"] });
+      toast.success("Budget updated");
     },
+    onError: (e) => toast.error(e.message),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.deleteBudget(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["budgets"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["budgets"] }); toast.success("Budget deleted"); },
   });
 
-  const onCreate = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!name.trim() || !amount || Number(amount) <= 0 || !startDate || !endDate) {
-      return;
-    }
-    await createMutation.mutateAsync();
-  };
-
-  const onEdit = async (budget: { id: number; amount: number; endDate: string }) => {
-    setEditingId(budget.id);
-    setEditAmount(String(budget.amount));
-    setEditEndDate(budget.endDate);
-  };
-
-  const onSaveEdit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (editingId && Number(editAmount) > 0) {
-      await updateMutation.mutateAsync(editingId);
-    }
-  };
+  const canCreate = name.trim() && Number(amount) > 0 && startDate && endDate;
 
   return (
     <ProtectedView>
       <AppShell>
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold text-zinc-900">Budgets</h1>
-            <p className="mt-1 text-zinc-600">Create and manage monthly budgets for spending categories.</p>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Budgets</h1>
+              <p className="text-sm text-muted-foreground">Track spending against budget limits.</p>
+            </div>
+            <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4 mr-1" /> New Budget</Button>
           </div>
 
-          <Card>
-            <form onSubmit={onCreate} className="space-y-4">
-              <h2 className="font-semibold text-lg">Create new budget</h2>
-              <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-                <Input
-                  label="Budget name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g., Groceries"
-                />
-                <Input
-                  label="Amount"
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                />
-                <Select
-                  label="Category"
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                >
-                  <option value="">Select category</option>
-                  {categoriesQuery.data?.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </Select>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-sm font-medium text-zinc-700">Start date</label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                    />
+          {/* Budget cards with progress bars */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {budgetsQuery.data?.content?.map((row) => {
+              const spent = Number(row.spent || 0);
+              const budgetAmt = Number(row.amount || 1);
+              const pct = Math.min((spent / budgetAmt) * 100, 100);
+              const over = spent > budgetAmt;
+              return (
+                <div key={row.id} className="rounded-lg border bg-card p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold">{row.name}</p>
+                      <p className="text-xs text-muted-foreground">{row.startDate} → {row.endDate}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon-xs" onClick={() => setEditingBudget({ id: row.id, amount: String(row.amount), endDate: row.endDate })}>
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon-xs" className="text-destructive" onClick={() => deleteMutation.mutate(row.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-zinc-700">End date</label>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                    />
+                  {/* Progress bar */}
+                  <div className="space-y-1">
+                    <div className="h-2.5 w-full rounded-full bg-muted">
+                      <div
+                        className={`h-2.5 rounded-full transition-all ${over ? "bg-destructive" : pct > 75 ? "bg-amber-500" : "bg-primary"}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className={over ? "text-destructive font-medium" : "text-muted-foreground"}>
+                        {formatCurrency(spent)} spent
+                      </span>
+                      <span className="text-muted-foreground">{formatCurrency(budgetAmt)} limit</span>
+                    </div>
                   </div>
+                  {over && <Badge variant="destructive" className="text-[10px]">Over budget by {formatCurrency(spent - budgetAmt)}</Badge>}
                 </div>
-              </div>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={createMutation.isPending}
-                className="w-full md:w-auto"
-              >
-                <Plus className="h-4 w-4" />
-                {createMutation.isPending ? "Creating..." : "Create budget"}
-              </Button>
-            </form>
-          </Card>
+              );
+            })}
+          </div>
 
-          <Card>
-            <div className="space-y-4">
-              <h2 className="font-semibold text-lg">Budget list</h2>
-              <div className="space-y-2">
-                {budgetsQuery.data?.content?.map((row) => (
-                  <div key={row.id}>
-                    {editingId === row.id ? (
-                      // Edit form
-                      <form
-                        onSubmit={onSaveEdit}
-                        className="p-4 rounded-lg border border-teal-300 bg-teal-50 space-y-3"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="font-semibold text-zinc-900">Edit Budget</h3>
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(null)}
-                            className="text-zinc-500 hover:text-zinc-700"
-                          >
-                            <X className="h-5 w-5" />
-                          </button>
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-3">
-                          <Input
-                            label="Amount"
-                            type="number"
-                            value={editAmount}
-                            onChange={(e) => setEditAmount(e.target.value)}
-                          />
-                          <Input
-                            label="End date"
-                            type="date"
-                            value={editEndDate}
-                            onChange={(e) => setEditEndDate(e.target.value)}
-                          />
-                          <div className="flex items-end gap-2">
-                            <Button
-                              type="submit"
-                              variant="primary"
-                              disabled={updateMutation.isPending}
-                              className="flex-1"
-                            >
-                              {updateMutation.isPending ? "Saving..." : "Save"}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              onClick={() => setEditingId(null)}
-                              className="flex-1"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      </form>
-                    ) : (
-                      // Display form
-                      <div className="flex items-center justify-between p-4 rounded-lg border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 transition">
-                        <div className="flex-1">
-                          <p className="font-medium text-zinc-900">{row.name}</p>
-                          <p className="text-sm text-zinc-600">
-                            Budget: ${Number(row.amount || 0).toFixed(2)} • {row.startDate} to {row.endDate}
-                          </p>
-                          {row.spent && (
-                            <div className="mt-2 h-2 w-full rounded-full bg-zinc-200">
-                              <div
-                                className={`h-2 rounded-full ${
-                                  Number(row.spent) > Number(row.amount) ? "bg-red-600" : "bg-teal-600"
-                                }`}
-                                style={{ width: `${Math.min((Number(row.spent) / Number(row.amount)) * 100, 100)}%` }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                        <div className="ml-4 text-right flex-shrink-0">
-                          <p className="text-sm font-medium text-zinc-900">
-                            Spent: ${Number(row.spent || 0).toFixed(2)}
-                          </p>
-                          <div className="mt-2 flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => onEdit(row)}
-                            >
-                              <Edit2 className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="danger"
-                              onClick={() => deleteMutation.mutate(row.id)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {!budgetsQuery.data?.content?.length && (
-                  <p className="text-center py-8 text-zinc-500">No budgets created yet. Create one to get started!</p>
-                )}
-              </div>
-            </div>
-          </Card>
+          {!budgetsQuery.data?.content?.length && (
+            <p className="text-center py-12 text-muted-foreground">No budgets yet. Create one to start tracking spending.</p>
+          )}
 
           {budgetsQuery.data && budgetsQuery.data.totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <Button
-                variant="secondary"
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={page === 0}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-zinc-600">
-                Page {page + 1} of {budgetsQuery.data.totalPages}
-              </span>
-              <Button
-                variant="secondary"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={budgetsQuery.data?.last ?? true}
-              >
-                Next
-              </Button>
+            <div className="flex items-center justify-center gap-4">
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>Previous</Button>
+              <span className="text-sm text-muted-foreground">Page {page + 1} of {budgetsQuery.data.totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={budgetsQuery.data?.last ?? true}>Next</Button>
             </div>
           )}
+
+          {/* Create Dialog */}
+          <Dialog open={showCreate} onOpenChange={setShowCreate}>
+            <DialogContent>
+              <DialogHeader><DialogTitle>New Budget</DialogTitle></DialogHeader>
+              <div className="grid gap-4 py-2">
+                <div className="grid gap-2"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Groceries" autoFocus /></div>
+                <div className="grid gap-2"><Label>Amount</Label><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" /></div>
+                <div className="grid gap-2">
+                  <Label>Category</Label>
+                  <Select value={categoryId} onValueChange={setCategoryId}>
+                    <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                    <SelectContent>
+                      {categoriesQuery.data?.map((cat) => <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-2"><Label>Start</Label><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
+                  <div className="grid gap-2"><Label>End</Label><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+                <Button onClick={() => createMutation.mutate()} disabled={!canCreate || createMutation.isPending}>
+                  {createMutation.isPending ? "Creating..." : "Create"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Dialog */}
+          <Dialog open={!!editingBudget} onOpenChange={(open) => { if (!open) setEditingBudget(null); }}>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Edit Budget</DialogTitle></DialogHeader>
+              <div className="grid gap-4 py-2">
+                <div className="grid gap-2"><Label>Amount</Label><Input type="number" value={editingBudget?.amount ?? ""} onChange={(e) => setEditingBudget((prev) => prev ? { ...prev, amount: e.target.value } : null)} /></div>
+                <div className="grid gap-2"><Label>End Date</Label><Input type="date" value={editingBudget?.endDate ?? ""} onChange={(e) => setEditingBudget((prev) => prev ? { ...prev, endDate: e.target.value } : null)} /></div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingBudget(null)}>Cancel</Button>
+                <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>Save</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </AppShell>
     </ProtectedView>

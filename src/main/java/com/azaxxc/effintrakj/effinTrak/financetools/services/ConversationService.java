@@ -38,12 +38,18 @@ public class ConversationService {
      * Create a new conversation for a user
      */
     public ChatConversation createConversation(Long userId, String title) {
+        String conversationId = "conv-" + userId + "-" + System.currentTimeMillis();
+        return createConversation(userId, title, conversationId);
+    }
+
+    /**
+     * Create a new conversation for a user with an explicit conversationId.
+     */
+    public ChatConversation createConversation(Long userId, String title, String conversationId) {
         logger.info("Creating new conversation for userId: {}, title: {}", userId, title);
 
         User user = userService.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
-
-        String conversationId = "conv-" + userId + "-" + System.currentTimeMillis();
 
         ChatConversation conversation = ChatConversation.builder()
                 .conversationId(conversationId)
@@ -74,7 +80,7 @@ public class ConversationService {
         }
 
         // Create new one
-        return createConversation(userId, "Chat");
+        return createConversation(userId, "Chat", conversationId);
     }
 
     /**

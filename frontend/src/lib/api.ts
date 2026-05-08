@@ -340,6 +340,21 @@ export const api = {
 		});
 	},
 
+	async updateExpense(id: number, payload: {
+		description?: string;
+		amount?: number;
+		date?: string;
+		categoryId?: number;
+		paymentMethod?: string;
+		paidTo?: string;
+		bankAccountId?: number;
+	}) {
+		return authFetch<Expense>(`/expenses/${id}`, {
+			method: "PUT",
+			body: JSON.stringify(payload),
+		});
+	},
+
 	async deleteExpense(id: number) {
 		return authFetch<unknown>(`/expenses/${id}`, { method: "DELETE" });
 	},
@@ -382,6 +397,21 @@ export const api = {
 	}) {
 		return authFetch<unknown>("/incomes", {
 			method: "POST",
+			body: JSON.stringify(payload),
+		});
+	},
+
+	async updateIncome(id: number, payload: {
+		description?: string;
+		amount?: number;
+		date?: string;
+		categoryId?: number;
+		source?: string;
+		note?: string;
+		bankAccountId?: number;
+	}) {
+		return authFetch<Income>(`/incomes/${id}`, {
+			method: "PUT",
 			body: JSON.stringify(payload),
 		});
 	},

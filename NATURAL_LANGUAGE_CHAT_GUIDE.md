@@ -9,7 +9,7 @@
 {
   "prompt": "Add $20 coffee and $50 groceries",
   "conversationId": "conv-123",
-  "model": "llama-3.3-70b-versatile"
+  "model": "google/gemma-3n-e4b-it"
 }
 ```
 

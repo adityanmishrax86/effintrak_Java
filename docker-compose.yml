@@ -37,7 +37,7 @@ services:
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
       MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
       # JVM Options
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
     ports:
@@ -74,8 +74,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: http://localhost:8080/api
-        NEXT_BASE_PATH: ""
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080/api}
+        NEXT_BASE_PATH: ${NEXT_BASE_PATH:-}
     container_name: effintrak-frontend
     ports:
       - "3000:3000"

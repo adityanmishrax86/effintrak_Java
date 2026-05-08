@@ -113,19 +113,6 @@ public class ChatService {
 
             if (isGenericNonFinancialPrompt(prompt)) {
                 String generalReply = generalAssistanceResponse();
-                conversationService.saveMessage(
-                        conversation.getId(),
-                        prompt,
-                        generalReply,
-                        "GENERAL_ASSISTANCE",
-                        "GENERAL_ASSISTANCE",
-                        selectedModel,
-                        promptTemplateService.getPromptProfile(),
-                        promptTemplateService.getPromptVersion(),
-                        null,
-                        true
-                );
-
                 AIExecutionResult response = AIExecutionResult.success(
                         generalReply,
                         "GENERAL_ASSISTANCE",
@@ -212,22 +199,6 @@ public class ChatService {
                     : result;
             logger.info("Final response: {}", formattedResponse);
 
-            // Step 4: Persist conversation
-            logger.info("Step 4: Persisting conversation...");
-            conversationService.saveMessage(
-                conversation.getId(),
-                prompt,
-                formattedResponse,
-                intentAnalysis.toUpperCase().trim(),
-                intentAnalysis.toUpperCase().trim(),
-                selectedModel,
-                promptTemplateService.getPromptProfile(),
-                promptTemplateService.getPromptVersion(),
-                null,
-                true
-            );
-            logger.info("Conversation persisted successfully");
-
             AIExecutionResult response = AIExecutionResult.success(
                     formattedResponse,
                     intentAnalysis.toUpperCase().trim(),
@@ -299,6 +270,7 @@ public class ChatService {
             response.setPromptProfile(promptTemplateService.getPromptProfile());
             response.setPromptVersion(promptTemplateService.getPromptVersion());
             response.addWarning(modelSelection.warning());
+            saveAuditIfConversationAvailable(conversation, prompt, response);
             return response;
         } catch (Exception e) {
             logger.error("Error processing prompt", e);

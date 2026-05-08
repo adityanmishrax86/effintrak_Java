@@ -1,27 +1,32 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit2, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, CreditCard, Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ProtectedView } from "@/components/protected-view";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { useUserSettings } from "@/lib/hooks/use-user-settings";
 
 export default function CreditsPage() {
   const queryClient = useQueryClient();
   const profile = useAuthStore((s) => s.profile);
+  const { formatCurrency, formatDate } = useUserSettings();
+  const [page, setPage] = useState(0);
+  const [showCreate, setShowCreate] = useState(false);
 
   const [cardName, setCardName] = useState("");
   const [amount, setAmount] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [creditLimit, setCreditLimit] = useState("");
   const [interestRate, setInterestRate] = useState("");
-  const [page, setPage] = useState(0);
-  
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editAmount, setEditAmount] = useState("");
-  const [editDueDate, setEditDueDate] = useState("");
 
   const creditsQuery = useQuery({
     queryKey: ["credits", profile?.id, page],
@@ -44,190 +49,114 @@ export default function CreditsPage() {
       });
     },
     onSuccess: () => {
-      setCardName("");
-      setAmount("");
-      setDueDate("");
-      setCreditLimit("");
-      setInterestRate("");
+      setShowCreate(false);
+      setCardName(""); setAmount(""); setDueDate(""); setCreditLimit(""); setInterestRate("");
       queryClient.invalidateQueries({ queryKey: ["credits"] });
+      toast.success("Credit bill added");
     },
+    onError: (e) => toast.error(e.message),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.deleteCredit(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["credits"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["credits"] }); toast.success("Marked as paid"); },
   });
 
-  const updateMutation = useMutation({
-    mutationFn: (id: number) =>
-      api.updateCredit(id, { amount: Number(editAmount), dueDate: editDueDate }),
-    onSuccess: () => {
-      setEditingId(null);
-      queryClient.invalidateQueries({ queryKey: ["credits"] });
-    },
-  });
+  const canCreate = cardName.trim() && Number(amount) > 0 && dueDate;
 
-  const onCreate = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!cardName.trim() || !amount || Number(amount) <= 0 || !dueDate) {
-      return;
-    }
-    await createMutation.mutateAsync();
-  };
+  function getDaysUntilDue(dueDateStr: string) {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const due = new Date(dueDateStr);
+    return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  }
 
   return (
     <ProtectedView>
       <AppShell>
         <div className="space-y-4">
-          <section className="surface-card rounded-xl p-6">
-            <h1 className="text-2xl font-bold">Credits</h1>
-            <p className="mt-1 text-sm text-zinc-600">Track credit card bills and payments.</p>
-          </section>
-
-          <section className="surface-card rounded-xl p-4">
-            <h2 className="font-semibold">Add credit card bill</h2>
-            <form onSubmit={onCreate} className="mt-3 grid gap-2 md:grid-cols-2 lg:grid-cols-4">
-              <input
-                value={cardName}
-                onChange={(e) => setCardName(e.target.value)}
-                placeholder="Card name"
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-              />
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="Bill amount"
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-              />
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-              />
-              <input
-                type="number"
-                step="0.1"
-                value={creditLimit}
-                onChange={(e) => setCreditLimit(e.target.value)}
-                placeholder="Credit limit"
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-              />
-              <input
-                type="number"
-                step="0.1"
-                value={interestRate}
-                onChange={(e) => setInterestRate(e.target.value)}
-                placeholder="Interest rate (%)"
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-              />
-              <button
-                type="submit"
-                className="rounded-md bg-teal-800 px-4 py-2 text-sm text-white disabled:opacity-60"
-                disabled={createMutation.isPending}
-              >
-                {createMutation.isPending ? "Saving..." : "Add bill"}
-              </button>
-            </form>
-          </section>
-
-          <section className="surface-card rounded-xl p-4">
-            <h2 className="font-semibold">Credit card bills</h2>
-            <div className="mt-3 space-y-2">
-              {creditsQuery.data?.content?.map((row) => {
-                const isOverdue = new Date(row.dueDate) < new Date();
-                const isEditing = editingId === row.id;
-                return (
-                  <article key={row.id} className="rounded-md border border-zinc-200 bg-white p-3">
-                    {isEditing ? (
-                      <div className="space-y-2">
-                        <input
-                          type="number"
-                          value={editAmount}
-                          onChange={(e) => setEditAmount(e.target.value)}
-                          placeholder="Bill amount"
-                          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
-                        />
-                        <input
-                          type="date"
-                          value={editDueDate}
-                          onChange={(e) => setEditDueDate(e.target.value)}
-                          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => updateMutation.mutate(row.id)}
-                            className="flex-1 rounded-md bg-teal-800 px-3 py-1.5 text-sm text-white disabled:opacity-60"
-                            disabled={updateMutation.isPending}
-                          >
-                            {updateMutation.isPending ? "Saving..." : "Save"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(null)}
-                            className="rounded-md border border-zinc-300 px-3 py-1.5"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <p className="font-medium">{row.cardName}</p>
-                          <p className={`text-sm ${isOverdue ? "text-red-600" : "text-zinc-600"}`}>
-                            ${Number(row.amount).toFixed(2)} due {row.dueDate}
-                            {row.interestRate ? ` · Interest: ${row.interestRate}%` : ""}
-                          </p>
-                        </div>
-                        <div className="flex gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingId(row.id);
-                              setEditAmount(String(row.amount));
-                              setEditDueDate(row.dueDate);
-                            }}
-                            className="rounded-md border border-zinc-300 px-2 py-1"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteMutation.mutate(row.id)}
-                            className="rounded-md border border-red-300 px-2 py-1 text-red-700"
-                          >
-                            Paid
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </article>
-                );
-              })}
-              {!creditsQuery.data?.content?.length ? <p className="text-sm text-zinc-500">No credit bills found.</p> : null}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Credits</h1>
+              <p className="text-sm text-muted-foreground">Track credit card bills and due dates.</p>
             </div>
-            <div className="mt-3 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
-              >
-                Previous
-              </button>
-              <span className="text-sm text-zinc-700">Page {page + 1} of {Math.max(1, creditsQuery.data?.totalPages || 1)}</span>
-              <button
-                type="button"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={Boolean(creditsQuery.data?.last)}
-                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-60"
-              >
-                Next
-              </button>
+            <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4 mr-1" /> Add Bill</Button>
+          </div>
+
+          {/* Credit cards grid */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {creditsQuery.data?.content?.map((row) => {
+              const days = getDaysUntilDue(row.dueDate);
+              const isOverdue = days < 0;
+              const isDueSoon = days >= 0 && days <= 3;
+              return (
+                <div key={row.id} className={`rounded-lg border bg-card p-4 space-y-3 ${isOverdue ? "border-destructive/50" : ""}`}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                      <p className="font-semibold">{row.cardName}</p>
+                    </div>
+                    {isOverdue && <Badge variant="destructive">Overdue</Badge>}
+                    {isDueSoon && !isOverdue && <Badge variant="outline" className="border-amber-400 text-amber-700">Due in {days}d</Badge>}
+                    {days > 3 && <Badge variant="secondary">{days}d left</Badge>}
+                  </div>
+
+                  <div>
+                    <p className="text-2xl font-bold">{formatCurrency(row.amount)}</p>
+                    <p className="text-xs text-muted-foreground">Due: {formatDate(row.dueDate)}</p>
+                    {row.interestRate ? <p className="text-xs text-muted-foreground">Interest: {row.interestRate}%</p> : null}
+                    {row.creditLimit ? <p className="text-xs text-muted-foreground">Limit: {formatCurrency(row.creditLimit)}</p> : null}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => deleteMutation.mutate(row.id)}
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Mark Paid
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+
+          {!creditsQuery.data?.content?.length && (
+            <div className="text-center py-12 space-y-2">
+              <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground/40" />
+              <p className="text-muted-foreground">No credit bills. Add one to track due dates.</p>
             </div>
-          </section>
+          )}
+
+          {creditsQuery.data && creditsQuery.data.totalPages > 1 && (
+            <div className="flex items-center justify-center gap-4">
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>Previous</Button>
+              <span className="text-sm text-muted-foreground">Page {page + 1} of {creditsQuery.data.totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={creditsQuery.data?.last ?? true}>Next</Button>
+            </div>
+          )}
+
+          {/* Create Dialog */}
+          <Dialog open={showCreate} onOpenChange={setShowCreate}>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Add Credit Bill</DialogTitle></DialogHeader>
+              <div className="grid gap-4 py-2">
+                <div className="grid gap-2"><Label>Card Name</Label><Input value={cardName} onChange={(e) => setCardName(e.target.value)} placeholder="e.g. Visa Platinum" autoFocus /></div>
+                <div className="grid gap-2"><Label>Bill Amount</Label><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" /></div>
+                <div className="grid gap-2"><Label>Due Date</Label><Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-2"><Label>Credit Limit</Label><Input type="number" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} placeholder="Optional" /></div>
+                  <div className="grid gap-2"><Label>Interest Rate %</Label><Input type="number" step="0.1" value={interestRate} onChange={(e) => setInterestRate(e.target.value)} placeholder="Optional" /></div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+                <Button onClick={() => createMutation.mutate()} disabled={!canCreate || createMutation.isPending}>
+                  {createMutation.isPending ? "Adding..." : "Add Bill"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </AppShell>
     </ProtectedView>
