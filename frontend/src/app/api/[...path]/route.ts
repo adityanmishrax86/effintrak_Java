@@ -9,11 +9,15 @@ async function handler(
 	const { path } = await params;
 	const target = `${BACKEND_URL}/api/${path.join("/")}${req.nextUrl.search}`;
 
-	const headers = new Headers(req.headers);
-	// Remove browser headers that cause CORS issues on the backend
-	headers.delete("host");
-	headers.delete("origin");
-	headers.delete("referer");
+	// Only forward headers the backend needs — strip all browser-specific
+	// headers (sec-fetch-*, cookie, origin, etc.) to avoid CORS/session issues
+	const headers = new Headers();
+	const auth = req.headers.get("authorization");
+	if (auth) headers.set("authorization", auth);
+	const ct = req.headers.get("content-type");
+	if (ct) headers.set("content-type", ct);
+	const accept = req.headers.get("accept");
+	if (accept) headers.set("accept", accept);
 
 	try {
 		const res = await fetch(target, {
