@@ -12,6 +12,7 @@ import {
   Gem,
   LayoutDashboard,
   LogOut,
+  Menu,
   PiggyBank,
   Receipt,
   RotateCw,
@@ -23,6 +24,7 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { QuickAddMenu } from "./quick-add-menu";
 import { CommandPalette } from "./command-palette";
 import { TransactionForm, type TransactionKind } from "./transaction-form";
@@ -73,6 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const profile = useAuthStore((s) => s.profile);
   const queryClient = useQueryClient();
   const [quickAddKind, setQuickAddKind] = useState<TransactionKind | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const accountsQuery = useQuery({
     queryKey: ["accounts-global", profile?.id],
@@ -134,13 +137,64 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.replace("/login");
   };
 
+  const navContent = (
+    <nav className="space-y-4">
+      {navGroups.map((group) => (
+        <div key={group.label}>
+          <p className="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+            {group.label}
+          </p>
+          <div className="space-y-0.5">
+            {group.items.map(({ href, label, icon: Icon }) => {
+              const isActive = pathname === href;
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 ${
+                    isActive
+                      ? "bg-gradient-to-r from-teal-600 to-teal-700 text-white shadow-sm"
+                      : "text-zinc-600 hover:bg-zinc-100 hover:text-teal-700"
+                  }`}
+                >
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <span>{label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </nav>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-blue-50">
       <CommandPalette onQuickAdd={handleQuickAdd} />
 
       <header className="sticky top-0 z-40 border-b border-teal-100 bg-white/80 backdrop-blur-md shadow-sm">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 sm:px-6 py-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon-sm" className="lg:hidden">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64 p-4">
+                <div className="flex items-center gap-3 mb-6 mt-2">
+                  <div className="rounded-lg bg-gradient-to-br from-teal-600 to-teal-700 p-2">
+                    <WalletCards className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-lg font-bold text-zinc-900">EffinTrak</h1>
+                    <p className="text-xs text-zinc-500">Personal Finance</p>
+                  </div>
+                </div>
+                {navContent}
+              </SheetContent>
+            </Sheet>
             <div className="rounded-lg bg-gradient-to-br from-teal-600 to-teal-700 p-2">
               <WalletCards className="h-5 w-5 text-white" />
             </div>
@@ -174,36 +228,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-7xl gap-6 px-6 py-6">
+      <div className="mx-auto flex w-full max-w-7xl gap-6 px-4 sm:px-6 py-6">
         <aside className="h-fit w-56 rounded-xl bg-white border border-zinc-200 shadow-sm p-3 sticky top-20 hidden lg:block">
-          <nav className="space-y-4">
-            {navGroups.map((group) => (
-              <div key={group.label}>
-                <p className="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-                  {group.label}
-                </p>
-                <div className="space-y-0.5">
-                  {group.items.map(({ href, label, icon: Icon }) => {
-                    const isActive = pathname === href;
-                    return (
-                      <Link
-                        key={href}
-                        href={href}
-                        className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 ${
-                          isActive
-                            ? "bg-gradient-to-r from-teal-600 to-teal-700 text-white shadow-sm"
-                            : "text-zinc-600 hover:bg-zinc-100 hover:text-teal-700"
-                        }`}
-                      >
-                        <Icon className="h-4 w-4 flex-shrink-0" />
-                        <span>{label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </nav>
+          {navContent}
         </aside>
 
         <main className="min-w-0 flex-1">{children}</main>

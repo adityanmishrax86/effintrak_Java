@@ -131,7 +131,7 @@ async function authFetch<T>(path: string, init?: RequestInit, allowRetry = true)
 
 	const res = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
 
-	if (res.status === 401 && allowRetry) {
+	if ((res.status === 401 || res.status === 403) && allowRetry) {
 		const refreshed = await refreshTokens();
 		if (!refreshed) {
 			throw new Error("Session expired. Please login again.");
