@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     const backendUrl = process.env.BACKEND_URL || "http://app:8080";
+    console.log("[next.config] Rewrite backend URL:", backendUrl);
     return [
       {
         source: "/api/:path*",
