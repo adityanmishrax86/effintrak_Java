@@ -26,12 +26,17 @@ import com.azaxxc.effintrakj.effinTrak.RecurringTransaction.service.RecurringTra
 import com.azaxxc.effintrakj.effinTrak.RecurringTransaction.dtos.RecurringTransactionRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.Transaction.service.TransactionService;
 import com.azaxxc.effintrakj.effinTrak.Report.service.ReportService;
+import com.azaxxc.effintrakj.effinTrak.usersettings.dto.UserSettingsResponse;
+import com.azaxxc.effintrakj.effinTrak.usersettings.service.UserSettingsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
+import java.util.Currency;
 import java.util.Comparator;
 import java.util.Locale;
 import java.util.Optional;
@@ -53,13 +58,15 @@ public class FinanceTools {
     private final RecurringTransactionService recurringTransactionService;
     private final TransactionService transactionService;
     private final ReportService reportService;
+    private final UserSettingsService userSettingsService;
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     public FinanceTools(ExpenseService expenseService, IncomeService incomeService, UserService userService,
                        BillService billService, BudgetService budgetService, CreditService creditService,
                        SavingsService savingsService, SubscriptionService subscriptionService,
                        TransferService transferService, RecurringTransactionService recurringTransactionService,
-                       TransactionService transactionService, ReportService reportService) {
+                       TransactionService transactionService, ReportService reportService,
+                       UserSettingsService userSettingsService) {
         this.expenseService = expenseService;
         this.incomeService = incomeService;
         this.userService = userService;
@@ -72,6 +79,7 @@ public class FinanceTools {
         this.recurringTransactionService = recurringTransactionService;
         this.transactionService = transactionService;
         this.reportService = reportService;
+        this.userSettingsService = userSettingsService;
     }
 
     // ==================== EXPENSE TOOLS ====================
@@ -98,7 +106,7 @@ public class FinanceTools {
             dto.setUserId(userId);
 
             expenseService.saveExpense(dto, userOpt.get());
-            return "Success: Expense of $" + amount + " recorded via " + (paymentMethod != null ? paymentMethod : "default payment method");
+            return "Success: Expense of " + formatCurrency(userId, amount) + " recorded via " + (paymentMethod != null ? paymentMethod : "default payment method");
         } catch (Exception e) {
             logger.error("Failed to add expense", e);
             return "Error: " + e.getMessage();
@@ -121,7 +129,7 @@ public class FinanceTools {
             String endStr = end.format(formatter);
             var page = expenseService.getExpenseByUserIdBetweenDatePeriods(userId, startStr, endStr, pageable);
             double total = page.stream().mapToDouble(x -> x.getAmount()).sum();
-            return "Total monthly spending: $" + String.format("%.2f", total);
+            return "Total monthly spending: " + formatCurrency(userId, total);
         } catch (Exception e) {
             logger.error("Error calculating monthly spending", e);
             return "Error: " + e.getMessage();
@@ -156,7 +164,7 @@ public class FinanceTools {
 
             StringBuilder summary = new StringBuilder("Spending by Category (Current Month):\n");
             categoryMap.forEach((category, amount) ->
-                summary.append(String.format("- %s: $%.2f\n", category, amount))
+                summary.append(String.format("- %s: %s\n", category, formatCurrency(userId, amount)))
             );
             return summary.toString();
         } catch (Exception e) {
@@ -187,7 +195,7 @@ public class FinanceTools {
             dto.setUserId(userId);
 
             incomeService.saveIncome(dto, userOpt.get());
-            return "Success: Income of $" + amount + " recorded from " + (source != null ? source : "unknown source");
+            return "Success: Income of " + formatCurrency(userId, amount) + " recorded from " + (source != null ? source : "unknown source");
         } catch (Exception e) {
             logger.error("Failed to add income", e);
             return "Error: " + e.getMessage();
@@ -210,7 +218,7 @@ public class FinanceTools {
             String endStr = end.format(formatter);
             var page = incomeService.getIncomeByUserIdBetweenDatePeriods(userId, startStr, endStr, pageable);
             double total = page.stream().mapToDouble(x -> x.getAmount()).sum();
-            return "Total monthly income: $" + String.format("%.2f", total);
+            return "Total monthly income: " + formatCurrency(userId, total);
         } catch (Exception e) {
             logger.error("Error calculating monthly income", e);
             return "Error: " + e.getMessage();
@@ -876,18 +884,18 @@ public class FinanceTools {
 
             StringBuilder result = new StringBuilder();
             result.append("Financial Report (").append(startDate).append(" to ").append(endDate).append("):\n");
-            result.append(String.format("Total Income: $%.2f\n", report.getTotalIncome()));
-            result.append(String.format("Total Expense: $%.2f\n", report.getTotalExpense()));
-            result.append(String.format("Balance: $%.2f\n\n", report.getBalance()));
+            result.append(String.format("Total Income: %s\n", formatCurrency(userId, report.getTotalIncome())));
+            result.append(String.format("Total Expense: %s\n", formatCurrency(userId, report.getTotalExpense())));
+            result.append(String.format("Balance: %s\n\n", formatCurrency(userId, report.getBalance())));
 
             result.append("Breakdown by Category:\n");
             result.append("Income Categories:\n");
             report.getIncomeByCategory().forEach((cat, amt) ->
-                result.append(String.format("  - %s: $%.2f\n", cat, amt)));
+                result.append(String.format("  - %s: %s\n", cat, formatCurrency(userId, amt))));
 
             result.append("Expense Categories:\n");
             report.getExpenseByCategory().forEach((cat, amt) ->
-                result.append(String.format("  - %s: $%.2f\n", cat, amt)));
+                result.append(String.format("  - %s: %s\n", cat, formatCurrency(userId, amt))));
 
             return result.toString();
         } catch (Exception e) {
@@ -911,8 +919,8 @@ public class FinanceTools {
 
             StringBuilder result = new StringBuilder("Monthly Trend (Last 12 Months):\n");
             monthlyTrends.forEach(trend -> result.append(String.format(
-                    "- %s: Income $%.2f | Expense $%.2f | Balance $%.2f\n",
-                    trend.getMonth(), trend.getIncome(), trend.getExpense(), trend.getBalance())));
+                    "- %s: Income %s | Expense %s | Balance %s\n",
+                    trend.getMonth(), formatCurrency(userId, trend.getIncome()), formatCurrency(userId, trend.getExpense()), formatCurrency(userId, trend.getBalance()))));
             return result.toString();
         } catch (Exception e) {
             logger.error("Error generating trend analysis", e);
@@ -933,8 +941,12 @@ public class FinanceTools {
             String normalizedKeyword = normalizeNullableText(keyword);
 
             return switch (normalizedType) {
-                case "MONTHLY_SPENDING" -> getMonthlySpending(userId);
-                case "MONTHLY_INCOME" -> getMonthlyIncome(userId);
+                case "MONTHLY_SPENDING" -> isSingleDayRange(effectiveStartDate, effectiveEndDate)
+                        ? getExpenseTotalForRange(userId, effectiveStartDate, effectiveEndDate)
+                        : getMonthlySpending(userId);
+                case "MONTHLY_INCOME" -> isSingleDayRange(effectiveStartDate, effectiveEndDate)
+                        ? getIncomeTotalForRange(userId, effectiveStartDate, effectiveEndDate)
+                        : getMonthlyIncome(userId);
                 case "FINANCIAL_SUMMARY" -> getFinancialSummary(userId);
                 case "SPENDING_BY_CATEGORY" -> getSpendingByCategory(userId);
                 case "REPORT" -> generateFinancialReportTool(userId, effectiveStartDate, effectiveEndDate);
@@ -950,8 +962,8 @@ public class FinanceTools {
                     }
                     StringBuilder result = new StringBuilder("Transactions matching '" + normalizedKeyword + "':\n");
                     matches.stream().limit(20).forEach(trans -> result.append(String.format(
-                            "- %s: %s $%.2f (%s)\n",
-                            trans.getDate(), trans.getType(), trans.getAmount(), trans.getDescription())));
+                            "- %s: %s %s (%s)\n",
+                            trans.getDate(), trans.getType(), formatCurrency(userId, trans.getAmount()), trans.getDescription())));
                     yield result.toString();
                 }
                 default -> searchTransactionsByDateTool(userId, effectiveStartDate, effectiveEndDate);
@@ -978,8 +990,8 @@ public class FinanceTools {
             double savingsRate = incomeAmount > 0 ? (balance / incomeAmount) * 100 : 0.0;
 
             return String.format(
-                    "Financial Summary:\n- Monthly Income: $%.2f\n- Monthly Expenses: $%.2f\n- Balance: $%.2f\n- Savings Rate: %.1f%%",
-                    incomeAmount, spendingAmount, balance, savingsRate);
+                    "Financial Summary:\n- Monthly Income: %s\n- Monthly Expenses: %s\n- Balance: %s\n- Savings Rate: %.1f%%",
+                    formatCurrency(userId, incomeAmount), formatCurrency(userId, spendingAmount), formatCurrency(userId, balance), savingsRate);
         } catch (Exception e) {
             logger.error("Error generating financial summary", e);
             return "Error: " + e.getMessage();
@@ -1102,8 +1114,68 @@ public class FinanceTools {
 
         StringBuilder result = new StringBuilder("Top Spending Categories (" + startDate + " to " + endDate + "):\n");
         for (var entry : topCategories) {
-            result.append(String.format("- %s: $%.2f\n", entry.getKey(), entry.getValue()));
+            result.append(String.format("- %s: %s\n", entry.getKey(), formatCurrency(userId, entry.getValue())));
         }
         return result.toString();
+    }
+
+    private String getExpenseTotalForRange(long userId, String startDate, String endDate) {
+        var report = reportService.generateReport(userId, startDate, endDate);
+        if (startDate.equals(endDate)) {
+            return "Your total expenses for " + formatDisplayDate(userId, startDate) + " were "
+                    + formatCurrency(userId, report.getTotalExpense()) + ".";
+        }
+        return "Your total expenses from " + formatDisplayDate(userId, startDate) + " to "
+                + formatDisplayDate(userId, endDate) + " were " + formatCurrency(userId, report.getTotalExpense()) + ".";
+    }
+
+    private String getIncomeTotalForRange(long userId, String startDate, String endDate) {
+        var report = reportService.generateReport(userId, startDate, endDate);
+        if (startDate.equals(endDate)) {
+            return "Your total income for " + formatDisplayDate(userId, startDate) + " was "
+                    + formatCurrency(userId, report.getTotalIncome()) + ".";
+        }
+        return "Your total income from " + formatDisplayDate(userId, startDate) + " to "
+                + formatDisplayDate(userId, endDate) + " was " + formatCurrency(userId, report.getTotalIncome()) + ".";
+    }
+
+    private boolean isSingleDayRange(String startDate, String endDate) {
+        return startDate != null && startDate.equals(endDate);
+    }
+
+    private String formatCurrency(long userId, double amount) {
+        UserSettingsResponse settings = userSettingsService.getEffectiveSettings(userId);
+        Locale locale = resolveLocale(settings.getLocale());
+        Currency currency = resolveCurrency(settings.getCurrencyCode());
+        NumberFormat numberFormat = NumberFormat.getCurrencyInstance(locale);
+        numberFormat.setCurrency(currency);
+        return numberFormat.format(amount);
+    }
+
+    private String formatDisplayDate(long userId, String isoDate) {
+        UserSettingsResponse settings = userSettingsService.getEffectiveSettings(userId);
+        Locale locale = resolveLocale(settings.getLocale());
+        try {
+            LocalDate date = LocalDate.parse(isoDate, formatter);
+            return date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(locale));
+        } catch (Exception ignored) {
+            return isoDate;
+        }
+    }
+
+    private Locale resolveLocale(String localeTag) {
+        if (localeTag == null || localeTag.isBlank()) {
+            return Locale.forLanguageTag("en-IN");
+        }
+        Locale locale = Locale.forLanguageTag(localeTag);
+        return locale.getLanguage().isBlank() ? Locale.forLanguageTag("en-IN") : locale;
+    }
+
+    private Currency resolveCurrency(String currencyCode) {
+        try {
+            return Currency.getInstance(currencyCode == null || currencyCode.isBlank() ? "INR" : currencyCode);
+        } catch (Exception ignored) {
+            return Currency.getInstance("INR");
+        }
     }
 }

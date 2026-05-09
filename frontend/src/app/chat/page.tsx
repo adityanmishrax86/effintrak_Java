@@ -109,6 +109,24 @@ function formatMessageTime(value?: string) {
   }).format(date);
 }
 
+function renderSimpleMarkdown(text: string) {
+  return text.split("\n").map((line, lineIndex) => {
+    const parts = line.split(/(\*\*.*?\*\*)/g).filter(Boolean);
+    return (
+      <span key={`line-${lineIndex}`}>
+        {parts.map((part, partIndex) =>
+          part.startsWith("**") && part.endsWith("**") ? (
+            <strong key={`part-${lineIndex}-${partIndex}`}>{part.slice(2, -2)}</strong>
+          ) : (
+            <span key={`part-${lineIndex}-${partIndex}`}>{part}</span>
+          )
+        )}
+        {lineIndex < text.split("\n").length - 1 ? <br /> : null}
+      </span>
+    );
+  });
+}
+
 export default function ChatPage() {
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
@@ -341,7 +359,7 @@ export default function ChatPage() {
                       </div>
                       <div className="max-w-[80%] space-y-2">
                         <div className="rounded-2xl rounded-bl-sm border bg-card px-4 py-2.5">
-                          <p className="text-sm whitespace-pre-wrap">{message.aiResponse}</p>
+                        <p className="text-sm whitespace-pre-wrap">{renderSimpleMarkdown(message.aiResponse)}</p>
                         </div>
                         {/* Confirmation card for operations */}
                         {message.operation && message.success && (
