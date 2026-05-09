@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -162,5 +163,55 @@ class CategoryServiceTest {
         // Then
         verify(categoryRepository, times(1)).deleteById(categoryId);
     }
-}
 
+    @Test
+    void seedDefaultCategories_WhenRepositoryEmpty_ShouldInsertDefaults() {
+        when(categoryRepository.findAll()).thenReturn(List.of());
+
+        categoryService.seedDefaultCategories();
+
+        verify(categoryRepository).saveAll(argThat(categories -> {
+            List<Category> savedCategories = toCategoryList(categories);
+            return savedCategories.size() == 10 &&
+                    savedCategories.stream()
+                                .map(Category::getName)
+                                .collect(Collectors.toSet())
+                                .containsAll(List.of(
+                                        "Food",
+                                        "Transport",
+                                        "Utilities",
+                                        "Entertainment",
+                                        "Healthcare",
+                                        "Education",
+                                        "Shopping",
+                                        "Travel",
+                                        "Savings",
+                                        "Other"
+                                ));
+        }));
+    }
+
+    @Test
+    void seedDefaultCategories_WhenDefaultsAlreadyExist_ShouldNotInsertDuplicates() {
+        Category food = CategoryTestDataBuilder.aCategory().withId(1L).withName("Food").build();
+        Category travel = CategoryTestDataBuilder.aCategory().withId(2L).withName("travel").build();
+        Category custom = CategoryTestDataBuilder.aCategory().withId(3L).withName("Custom").build();
+        when(categoryRepository.findAll()).thenReturn(List.of(food, travel, custom));
+
+        categoryService.seedDefaultCategories();
+
+        verify(categoryRepository).saveAll(argThat(categories -> {
+            List<Category> savedCategories = toCategoryList(categories);
+            return savedCategories.size() == 8 &&
+                    savedCategories.stream().map(Category::getName).noneMatch(name ->
+                                name.equalsIgnoreCase("Food") || name.equalsIgnoreCase("Travel")
+                        );
+        }));
+    }
+
+    private List<Category> toCategoryList(Iterable<Category> categories) {
+        return categories instanceof List<Category> categoryList
+                ? categoryList
+                : java.util.stream.StreamSupport.stream(categories.spliterator(), false).toList();
+    }
+}

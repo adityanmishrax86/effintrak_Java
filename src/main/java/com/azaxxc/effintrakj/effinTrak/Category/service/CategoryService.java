@@ -7,13 +7,29 @@ import com.azaxxc.effintrakj.effinTrak.globalcomponents.mappers.CategoryMapper;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class CategoryService {
+    private static final List<String> DEFAULT_CATEGORIES = List.of(
+            "Food",
+            "Transport",
+            "Utilities",
+            "Entertainment",
+            "Healthcare",
+            "Education",
+            "Shopping",
+            "Travel",
+            "Savings",
+            "Other"
+    );
+
     private final CategoryRepository categoryRepository;
     private final CategoryMapper mapper;
 
@@ -32,9 +48,31 @@ public class CategoryService {
         return categoryRepository.findAll().stream().map(mapper::toResponseDTO).collect(Collectors.toList());
     }
 
-    @PostConstruct
     public List<Category> getCategories() {
         return categoryRepository.findAll();
+    }
+
+    @PostConstruct
+    @Transactional
+    public void seedDefaultCategories() {
+        Set<String> existingCategories = getCategories().stream()
+                .map(Category::getName)
+                .map(String::trim)
+                .map(String::toLowerCase)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        List<Category> missingCategories = DEFAULT_CATEGORIES.stream()
+                .filter(categoryName -> !existingCategories.contains(categoryName.toLowerCase()))
+                .map(categoryName -> {
+                    Category category = new Category();
+                    category.setName(categoryName);
+                    return category;
+                })
+                .toList();
+
+        if (!missingCategories.isEmpty()) {
+            categoryRepository.saveAll(missingCategories);
+        }
     }
 
     public Optional<Category> getCategoryById(Long id) {
@@ -62,4 +100,3 @@ public class CategoryService {
         categoryRepository.deleteById(id);
     }
 }
-
