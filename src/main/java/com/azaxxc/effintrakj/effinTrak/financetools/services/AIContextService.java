@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
@@ -84,6 +85,7 @@ public class AIContextService {
         context.append(String.format("- Currency: %s%n", settings.getCurrencyCode()));
         context.append(String.format("- Locale: %s%n", settings.getLocale()));
         context.append(String.format("- Time Zone: %s%n", settings.getTimeZone()));
+        context.append(String.format("- Current Date In Time Zone: %s%n", getUserTodayDate(userId)));
         context.append(String.format("- Date Format: %s%n", settings.getDateFormat()));
         context.append(String.format("- Week Starts On: %s%n", settings.getWeekStartsOn()));
         context.append(String.format("- AI Persona: %s%n", settings.getAiPersona()));
@@ -109,5 +111,31 @@ public class AIContextService {
         return accounts.stream()
                 .map(a -> String.format("%d=%s", a.getId(), a.getName()))
                 .collect(Collectors.joining(", "));
+    }
+
+    public String getUserTimeZone(Long userId) {
+        UserSettingsResponse settings = userSettingsService.getEffectiveSettings(userId);
+        String zoneId = settings.getTimeZone();
+        return (zoneId == null || zoneId.isBlank()) ? "UTC" : zoneId.trim();
+    }
+
+    public String getUserTodayDate(Long userId) {
+        return com.azaxxc.effintrakj.effinTrak.financetools.config.ChatSystemConfig.getTodayDate(getUserTimeZone(userId));
+    }
+
+    public String buildConversationContext(List<com.azaxxc.effintrakj.effinTrak.financetools.models.ChatMessage> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return "";
+        }
+
+        String history = messages.stream()
+                .filter(message -> message.getUserMessage() != null || message.getAiResponse() != null)
+                .map(message -> String.format(Locale.ROOT,
+                        "USER: %s%nASSISTANT: %s",
+                        message.getUserMessage() == null ? "" : message.getUserMessage().trim(),
+                        message.getAiResponse() == null ? "" : message.getAiResponse().trim()))
+                .collect(Collectors.joining("\n\n"));
+
+        return history.isBlank() ? "" : "\n=== RECENT CONVERSATION CONTEXT ===\n" + history + "\n";
     }
 }

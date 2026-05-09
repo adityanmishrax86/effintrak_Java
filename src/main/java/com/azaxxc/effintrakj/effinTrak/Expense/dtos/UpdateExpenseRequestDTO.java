@@ -10,6 +10,7 @@ public class UpdateExpenseRequestDTO {
     private Double amount;
     private String date; // Consider using LocalDate for better date handling
     private Long categoryId;
+    private Long bankAccountId;
     private String paymentMethod;
     private String paidTo;
     private boolean isRecurring;

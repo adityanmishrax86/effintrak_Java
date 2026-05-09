@@ -16,7 +16,9 @@ public interface IncomeMapper {
     IncomeMapper INSTANCE  = Mappers.getMapper(IncomeMapper.class);
 
     @Mapping(target = "category", source="category", qualifiedByName = "mapCategoryObject")
+    @Mapping(target = "categoryId", source = "category", qualifiedByName = "mapCategoryId")
     @Mapping(target = "bankAccount", source="bankAccount", qualifiedByName = "mapBankAccountObject")
+    @Mapping(target = "bankAccountId", source = "bankAccount", qualifiedByName = "mapBankAccountId")
     IncomeResponse toIncomeResponse(Income income);
 
 
@@ -37,7 +39,15 @@ public interface IncomeMapper {
         return null != bankAccount ? bankAccount.getName() : "";
     }
 
+    @Named("mapCategoryId")
+    default Long mapCategoryId(Category category) {
+        return category != null ? category.getId() : null;
+    }
+
+    @Named("mapBankAccountId")
+    default Long mapBankAccountId(BankAccount bankAccount) {
+        return bankAccount != null ? bankAccount.getId() : null;
+    }
 
 
 }
-

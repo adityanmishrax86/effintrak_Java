@@ -52,9 +52,11 @@ export type Expense = {
   description: string;
   amount: number;
   category?: string;
+  categoryId?: number;
   date: string;
   paymentMethod?: string;
   bankAccount?: string;
+  bankAccountId?: number;
   paidTo?: string;
   isRecurring?: boolean;
 };
@@ -64,9 +66,11 @@ export type Income = {
   description: string;
   amount: number;
   category?: string;
+  categoryId?: number;
   source?: string;
   note?: string;
   bankAccount?: string;
+  bankAccountId?: number;
   date: string;
 };
 

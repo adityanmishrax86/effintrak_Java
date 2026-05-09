@@ -200,6 +200,8 @@ export default function IncomesPage() {
             description: editingIncome.description,
             amount: editingIncome.amount,
             date: editingIncome.date,
+            categoryId: editingIncome.categoryId,
+            bankAccountId: editingIncome.bankAccountId,
             source: editingIncome.source || "",
             note: editingIncome.note || "",
           } : undefined}

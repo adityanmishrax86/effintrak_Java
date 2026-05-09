@@ -236,6 +236,8 @@ export default function ExpensesPage() {
             description: editingExpense.description,
             amount: editingExpense.amount,
             date: editingExpense.date,
+            categoryId: editingExpense.categoryId,
+            bankAccountId: editingExpense.bankAccountId,
             paymentMethod: editingExpense.paymentMethod || "CARD",
             paidTo: editingExpense.paidTo || "",
           } : undefined}

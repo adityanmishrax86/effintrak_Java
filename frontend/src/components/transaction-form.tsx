@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
@@ -64,8 +65,7 @@ export function TransactionForm({
   isSubmitting,
   title,
 }: TransactionFormProps) {
-  const schema = kind === "expense" ? expenseSchema : incomeSchema;
-  type FormValues = z.infer<typeof schema>;
+  type FormValues = z.infer<typeof expenseSchema> | z.infer<typeof incomeSchema>;
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -78,6 +78,18 @@ export function TransactionForm({
       ...defaultValues,
     } as FormValues,
   });
+
+  useEffect(() => {
+    form.reset({
+      description: "",
+      amount: 0,
+      date: new Date().toISOString().split("T")[0],
+      categoryId: categories[0]?.id || 1,
+      bankAccountId: accounts[0]?.id || 1,
+      ...(kind === "expense" ? { paymentMethod: "CARD", paidTo: "" } : { source: "", note: "" }),
+      ...defaultValues,
+    } as FormValues);
+  }, [accounts, categories, defaultValues, form, kind, open]);
 
   const handleSubmit = form.handleSubmit(async (values) => {
     await onSubmit(values as Record<string, unknown>);

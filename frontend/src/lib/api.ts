@@ -349,7 +349,7 @@ export const api = {
 		paidTo?: string;
 		bankAccountId?: number;
 	}) {
-		return authFetch<Expense>(`/expenses/${id}`, {
+		return authFetch<Expense>(`/expenses/user/${id}`, {
 			method: "PUT",
 			body: JSON.stringify(payload),
 		});
@@ -410,7 +410,7 @@ export const api = {
 		note?: string;
 		bankAccountId?: number;
 	}) {
-		return authFetch<Income>(`/incomes/${id}`, {
+		return authFetch<Income>(`/incomes/user/${id}`, {
 			method: "PUT",
 			body: JSON.stringify(payload),
 		});

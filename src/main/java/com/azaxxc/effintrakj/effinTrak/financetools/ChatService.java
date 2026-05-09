@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 @Service
 public class ChatService {
@@ -106,7 +107,7 @@ public class ChatService {
             // Step 0: Load AI context
             logger.info("Step 0: Loading AI context with user's categories and bank accounts...");
             conversation = conversationService.getOrCreateConversation(userId, conversationId);
-            String userContext = aiContextService.buildUserContext(userId);
+            String userContext = buildPromptContext(userId, conversation);
             if (ChatSystemConfig.LOG_AI_CONTEXT) {
                 logger.debug("User context loaded: {}", userContext);
             }
@@ -455,16 +456,17 @@ public class ChatService {
      */
     private String handleAddExpense(String prompt, long userId, String userContext) {
         logger.debug("Extracting expense parameters from prompt: {}", prompt);
+        String todayDate = aiContextService.getUserTodayDate(userId);
 
         try {
             if (isBatchAddRequest(prompt)) {
-                String batchResult = handleBatchAddExpense(prompt, userId, userContext);
+                String batchResult = handleBatchAddExpense(prompt, userId, userContext, todayDate);
                 if (batchResult != null) {
                     return batchResult;
                 }
             }
 
-            String paramExtraction = promptTemplateService.expenseParams(userContext, prompt, ChatSystemConfig.getTodayDate());
+            String paramExtraction = promptTemplateService.expenseParams(userContext, prompt, todayDate);
 
             logger.debug("Sending parameter extraction request...");
             String params = chatClient.prompt()
@@ -488,9 +490,11 @@ public class ChatService {
             long bankAccountId = extractNumber(params, "BANK_ACCOUNT_ID").longValue();
             String date = extractDate(params, "DATE");
             String description = extractText(params, "DESCRIPTION");
+            String paymentMethod = normalizeOptionalField(extractText(params, "PAYMENT_METHOD"));
+            String paidTo = normalizeOptionalField(extractText(params, "PAID_TO"));
 
-            logger.info("Parsed parameters - Amount: {}, Category: {}, Account: {}, Date: {}, Description: {}",
-                amount, categoryId, bankAccountId, date, description);
+            logger.info("Parsed parameters - Amount: {}, Category: {}, Account: {}, Date: {}, Description: {}, PaymentMethod: {}, PaidTo: {}",
+                amount, categoryId, bankAccountId, date, description, paymentMethod, paidTo);
 
             // Comprehensive validation of all parameters
             ValidationResult completeValidation = responseValidator.validateExpenseAdditionRequest(
@@ -514,7 +518,7 @@ public class ChatService {
                 // Log but don't block - just inform user
             }
 
-            String result = financeTools.addExpenseTool(amount, categoryId, bankAccountId, date, description, null, null, userId);
+            String result = financeTools.addExpenseTool(amount, categoryId, bankAccountId, date, description, paymentMethod, paidTo, userId);
             logger.info("Expense added successfully: {}", result);
             return result;
 
@@ -531,16 +535,17 @@ public class ChatService {
      */
     private String handleAddIncome(String prompt, long userId, String userContext) {
         logger.debug("Extracting income parameters from prompt: {}", prompt);
+        String todayDate = aiContextService.getUserTodayDate(userId);
 
         try {
             if (isBatchAddRequest(prompt)) {
-                String batchResult = handleBatchAddIncome(prompt, userId, userContext);
+                String batchResult = handleBatchAddIncome(prompt, userId, userContext, todayDate);
                 if (batchResult != null) {
                     return batchResult;
                 }
             }
 
-            String paramExtraction = promptTemplateService.incomeParams(userContext, prompt, ChatSystemConfig.getTodayDate());
+            String paramExtraction = promptTemplateService.incomeParams(userContext, prompt, todayDate);
 
             logger.debug("Sending income parameter extraction request...");
             String params = chatClient.prompt()
@@ -564,9 +569,11 @@ public class ChatService {
             String description = extractText(params, "DESCRIPTION");
             long categoryId = extractNumber(params, "CATEGORY_ID").longValue();
             long bankAccountId = extractNumber(params, "BANK_ACCOUNT_ID").longValue();
+            String source = normalizeOptionalField(extractText(params, "SOURCE"));
+            String note = normalizeOptionalField(extractText(params, "NOTE"));
 
-            logger.info("Parsed income parameters - Amount: {}, Date: {}, Description: {}, Category: {}, Account: {}",
-                amount, date, description, categoryId, bankAccountId);
+            logger.info("Parsed income parameters - Amount: {}, Date: {}, Description: {}, Category: {}, Account: {}, Source: {}, Note: {}",
+                amount, date, description, categoryId, bankAccountId, source, note);
 
             // Validate income parameters
             ValidationResult incomeValidation = responseValidator.validateIncomeAdditionRequest(
@@ -583,7 +590,7 @@ public class ChatService {
                 logger.warn("Anomaly detected for user {}: {}", userId, anomalyResult.getAnomalySummary());
             }
 
-            String result = financeTools.addIncomeTool(amount, description, null, null, bankAccountId, date, categoryId, userId);
+            String result = financeTools.addIncomeTool(amount, description, source, note, bankAccountId, date, categoryId, userId);
             logger.info("Income added successfully: {}", result);
             return result;
 
@@ -606,7 +613,7 @@ public class ChatService {
         logger.debug("Attempting to extract update parameters: {}", prompt);
 
         try {
-            String paramExtraction = promptTemplateService.updateExpenseParams(userContext, prompt, ChatSystemConfig.getTodayDate());
+            String paramExtraction = promptTemplateService.updateExpenseParams(userContext, prompt, aiContextService.getUserTodayDate(userId));
 
             String params = chatClient.prompt()
                     .user(paramExtraction)
@@ -731,7 +738,7 @@ public class ChatService {
 
     private String handleCreateSavingsGoal(String prompt, long userId, String userContext) {
         String params = chatClient.prompt()
-                .user(promptTemplateService.createSavingsParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .user(promptTemplateService.createSavingsParams(userContext, prompt, aiContextService.getUserTodayDate(userId)))
                 .call()
                 .content();
         String name = extractText(params, "NAME");
@@ -779,7 +786,7 @@ public class ChatService {
 
     private String handleAddSubscription(String prompt, long userId, String userContext) {
         String params = chatClient.prompt()
-                .user(promptTemplateService.addSubscriptionParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .user(promptTemplateService.addSubscriptionParams(userContext, prompt, aiContextService.getUserTodayDate(userId)))
                 .call()
                 .content();
         String name = extractText(params, "NAME");
@@ -795,7 +802,7 @@ public class ChatService {
 
     private String handleCancelSubscription(String prompt, long userId, String userContext) {
         String params = chatClient.prompt()
-                .user(promptTemplateService.cancelSubscriptionParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .user(promptTemplateService.cancelSubscriptionParams(userContext, prompt, aiContextService.getUserTodayDate(userId)))
                 .call()
                 .content();
         long subscriptionId = extractNumber(params, "SUBSCRIPTION_ID").longValue();
@@ -805,7 +812,7 @@ public class ChatService {
 
     private String handleAddCredit(String prompt, long userId, String userContext) {
         String params = chatClient.prompt()
-                .user(promptTemplateService.addCreditParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .user(promptTemplateService.addCreditParams(userContext, prompt, aiContextService.getUserTodayDate(userId)))
                 .call()
                 .content();
         String description = extractText(params, "DESCRIPTION");
@@ -816,12 +823,13 @@ public class ChatService {
         }
         String dueDate = extractDate(params, "DUE_DATE");
         double interestRate = extractNumber(params, "INTEREST_RATE");
-        return financeTools.addCreditTool(description, amount, type, dueDate, interestRate, "", userId);
+        String paymentMethod = normalizeOptionalField(extractText(params, "PAYMENT_METHOD"));
+        return financeTools.addCreditTool(description, amount, type, dueDate, interestRate, paymentMethod, userId);
     }
 
     private String handleMakeCreditPayment(String prompt, long userId, String userContext) {
         String params = chatClient.prompt()
-                .user(promptTemplateService.creditPaymentParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .user(promptTemplateService.creditPaymentParams(userContext, prompt, aiContextService.getUserTodayDate(userId)))
                 .call()
                 .content();
         long creditId = extractNumber(params, "CREDIT_ID").longValue();
@@ -832,7 +840,7 @@ public class ChatService {
 
     private String handleTransferMoney(String prompt, long userId, String userContext) {
         String params = chatClient.prompt()
-                .user(promptTemplateService.transferParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .user(promptTemplateService.transferParams(userContext, prompt, aiContextService.getUserTodayDate(userId)))
                 .call()
                 .content();
         long fromAccountId = extractNumber(params, "FROM_ACCOUNT_ID").longValue();
@@ -845,7 +853,7 @@ public class ChatService {
 
     private String handleCreateRecurringTransaction(String prompt, long userId, String userContext) {
         String params = chatClient.prompt()
-                .user(promptTemplateService.createRecurringParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .user(promptTemplateService.createRecurringParams(userContext, prompt, aiContextService.getUserTodayDate(userId)))
                 .call()
                 .content();
         String type = extractText(params, "TYPE");
@@ -854,8 +862,7 @@ public class ChatService {
         long categoryId = extractNumber(params, "CATEGORY_ID").longValue();
         String frequency = extractText(params, "FREQUENCY");
         String startDate = extractDate(params, "START_DATE");
-        String bankAccount = extractText(params, "BANK_ACCOUNT_ID");
-        String paymentMethod = bankAccount.isBlank() ? "" : bankAccount;
+        String paymentMethod = normalizeOptionalField(extractText(params, "PAYMENT_METHOD"));
         return financeTools.createRecurringTransactionTool(type, description, amount, categoryId, frequency, startDate, null, paymentMethod, userId);
     }
 
@@ -880,7 +887,7 @@ public class ChatService {
 
     private String handleQueryFinancialData(String prompt, long userId, String userContext) {
         String params = chatClient.prompt()
-                .user(promptTemplateService.financialQueryParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .user(promptTemplateService.financialQueryParams(userContext, prompt, aiContextService.getUserTodayDate(userId)))
                 .call()
                 .content();
         String queryType = extractText(params, "QUERY_TYPE");
@@ -1031,9 +1038,9 @@ public class ChatService {
         );
     }
 
-    private String handleBatchAddExpense(String prompt, long userId, String userContext) {
+    private String handleBatchAddExpense(String prompt, long userId, String userContext, String todayDate) {
         String batchParams = chatClient.prompt()
-                .user(promptTemplateService.expenseBatchParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .user(promptTemplateService.expenseBatchParams(userContext, prompt, todayDate))
                 .call()
                 .content();
         List<String> lines = parseBatchLines(batchParams);
@@ -1049,8 +1056,10 @@ public class ChatService {
             long bankAccountId = extractNumber(line, "BANK_ACCOUNT_ID").longValue();
             String date = extractDate(line, "DATE");
             String description = extractText(line, "DESCRIPTION");
+            String paymentMethod = normalizeOptionalField(extractText(line, "PAYMENT_METHOD"));
+            String paidTo = normalizeOptionalField(extractText(line, "PAID_TO"));
 
-            String result = financeTools.addExpenseTool(amount, categoryId, bankAccountId, date, description, null, null, userId);
+            String result = financeTools.addExpenseTool(amount, categoryId, bankAccountId, date, description, paymentMethod, paidTo, userId);
             results.add(result);
             if (result.startsWith("Success:")) {
                 successCount++;
@@ -1060,9 +1069,9 @@ public class ChatService {
                 + "\n" + String.join("\n", results);
     }
 
-    private String handleBatchAddIncome(String prompt, long userId, String userContext) {
+    private String handleBatchAddIncome(String prompt, long userId, String userContext, String todayDate) {
         String batchParams = chatClient.prompt()
-                .user(promptTemplateService.incomeBatchParams(userContext, prompt, ChatSystemConfig.getTodayDate()))
+                .user(promptTemplateService.incomeBatchParams(userContext, prompt, todayDate))
                 .call()
                 .content();
         List<String> lines = parseBatchLines(batchParams);
@@ -1078,8 +1087,10 @@ public class ChatService {
             String description = extractText(line, "DESCRIPTION");
             long categoryId = extractNumber(line, "CATEGORY_ID").longValue();
             long bankAccountId = extractNumber(line, "BANK_ACCOUNT_ID").longValue();
+            String source = normalizeOptionalField(extractText(line, "SOURCE"));
+            String note = normalizeOptionalField(extractText(line, "NOTE"));
 
-            String result = financeTools.addIncomeTool(amount, description, null, null, bankAccountId, date, categoryId, userId);
+            String result = financeTools.addIncomeTool(amount, description, source, note, bankAccountId, date, categoryId, userId);
             results.add(result);
             if (result.startsWith("Success:")) {
                 successCount++;
@@ -1167,5 +1178,28 @@ public class ChatService {
                 + "\"show my monthly summary\", "
                 + "\"add 20 coffee and 50 groceries\", "
                 + "\"show top spending categories this month\".";
+    }
+
+    private String buildPromptContext(long userId, ChatConversation conversation) {
+        String baseContext = aiContextService.buildUserContext(userId);
+        if (conversation == null) {
+            return baseContext;
+        }
+        List<com.azaxxc.effintrakj.effinTrak.financetools.models.ChatMessage> recentMessages =
+                conversationService.getRecentMessages(conversation.getId(), 6).stream()
+                        .sorted(java.util.Comparator.comparing(com.azaxxc.effintrakj.effinTrak.financetools.models.ChatMessage::getCreatedAt))
+                        .collect(Collectors.toList());
+        return baseContext + aiContextService.buildConversationContext(recentMessages);
+    }
+
+    private String normalizeOptionalField(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty() || "NONE".equalsIgnoreCase(trimmed) || "NULL".equalsIgnoreCase(trimmed)) {
+            return null;
+        }
+        return trimmed;
     }
 }

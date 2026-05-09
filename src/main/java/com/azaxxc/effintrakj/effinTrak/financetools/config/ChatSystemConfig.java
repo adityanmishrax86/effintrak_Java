@@ -1,6 +1,7 @@
 package com.azaxxc.effintrakj.effinTrak.financetools.config;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 /**
  * Configuration class for AI chat system settings.
@@ -73,5 +74,16 @@ public class ChatSystemConfig {
 
     public static String getTodayDate() {
         return LocalDate.now().toString();
+    }
+
+    public static String getTodayDate(String zoneId) {
+        if (zoneId == null || zoneId.isBlank()) {
+            return getTodayDate();
+        }
+        try {
+            return LocalDate.now(ZoneId.of(zoneId.trim())).toString();
+        } catch (Exception ignored) {
+            return getTodayDate();
+        }
     }
 }

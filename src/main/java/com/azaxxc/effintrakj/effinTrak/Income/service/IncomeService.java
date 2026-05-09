@@ -107,6 +107,11 @@ public class IncomeService {
         Category ctg = categoryService.getCategories().stream().filter(x -> Objects.equals(x.getId(), dto.getCategoryId()))
                 .findFirst().orElseThrow(() -> new IllegalArgumentException(("No Category found with id:" + dto.getCategoryId())));
         currentIncome.setCategory(ctg);
+        if (dto.getBankAccountId() != null) {
+            BankAccount bankAccount = bankAccountService.getBankAccountById(dto.getBankAccountId())
+                    .orElseThrow(() -> new IllegalArgumentException("No Bank Account found with id:" + dto.getBankAccountId()));
+            currentIncome.setBankAccount(bankAccount);
+        }
 
         try {
             incomeRepository.save(currentIncome);

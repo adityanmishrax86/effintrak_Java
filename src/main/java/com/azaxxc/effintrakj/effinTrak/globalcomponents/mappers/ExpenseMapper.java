@@ -19,7 +19,9 @@ public interface ExpenseMapper {
     ExpenseMapper INSTANCE  = Mappers.getMapper(ExpenseMapper.class);
 
     @Mapping(target = "category", source="category", qualifiedByName = "mapCategoryObject")
+    @Mapping(target = "categoryId", source = "category", qualifiedByName = "mapCategoryId")
     @Mapping(target = "bankAccount", source="bankAccount", qualifiedByName = "mapBankAccountObject")
+    @Mapping(target = "bankAccountId", source = "bankAccount", qualifiedByName = "mapBankAccountId")
     ExpenseResponse toExpenseResponse(Expense expense);
 
     @Mapping(target = "id", ignore = true)
@@ -37,5 +39,15 @@ public interface ExpenseMapper {
     @Named("mapBankAccountObject")
     default String mapBankAccountObject(BankAccount bankAccount) {
         return null != bankAccount ? bankAccount.getName() : "";
+    }
+
+    @Named("mapCategoryId")
+    default Long mapCategoryId(Category category) {
+        return category != null ? category.getId() : null;
+    }
+
+    @Named("mapBankAccountId")
+    default Long mapBankAccountId(BankAccount bankAccount) {
+        return bankAccount != null ? bankAccount.getId() : null;
     }
 }

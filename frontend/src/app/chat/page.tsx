@@ -2,35 +2,42 @@
 
 import { FormEvent, useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, Check, ExternalLink, History, Loader2, Mic, MicOff, Send, Slash, Trash2, User, X } from "lucide-react";
+import { Bot, Check, History, Loader2, Mic, MicOff, Send, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ProtectedView } from "@/components/protected-view";
 import { api } from "@/lib/api";
-import { useAuthStore } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useVoiceInput } from "@/lib/hooks/use-voice-input";
 import type { ChatConversationMessage } from "@/lib/types";
 
-type PromptCategory = "expenses" | "incomes" | "budgets" | "transfers" | "recurring" | "subscriptions" | "credits" | "savings";
+type PromptCategory = "expenses" | "incomes" | "budgets" | "transfers" | "recurring" | "subscriptions" | "credits" | "savings" | "analytics";
 
 const PROMPT_PRESETS: Record<PromptCategory, { label: string; prompts: string[] }> = {
   expenses: {
     label: "Expenses",
     prompts: [
       "Add an expense of $45 for groceries paid via card today.",
-      "Record a $12 coffee expense under Food and Drinks.",
-      "Show my top expense categories for this month.",
+      "Record a $12 coffee expense under Food and Drinks paid by UPI to Starbucks.",
+      "I spent $18 on breakfast at Cafe Rio and $42 on groceries at DMart today from UPI.",
+    ],
+  },
+  analytics: {
+    label: "Finance Queries",
+    prompts: [
+      "What were my total expenses yesterday?",
+      "Show my top spending categories for this month.",
+      "Give me a financial report from 2026-05-01 to 2026-05-09.",
     ],
   },
   incomes: {
     label: "Incomes",
     prompts: [
-      "Add salary income of $3,000 received today in my primary account.",
-      "Record freelance income of $650 from Acme project.",
+      "Add salary income of $3,000 received today in my primary account from Acme Corp.",
+      "Record freelance income of $650 from Acme project with note milestone 2.",
       "Compare this month's income vs last month.",
     ],
   },
@@ -53,8 +60,8 @@ const PROMPT_PRESETS: Record<PromptCategory, { label: string; prompts: string[] 
   recurring: {
     label: "Recurring",
     prompts: [
-      "Create a recurring electricity expense of $90 monthly.",
-      "Add a recurring income of $500 every Friday.",
+      "Create a recurring electricity expense of $90 monthly paid by UPI to BESCOM.",
+      "Add a recurring income of $500 every Friday from Rental Income.",
       "List my active recurring transactions.",
     ],
   },
@@ -69,7 +76,7 @@ const PROMPT_PRESETS: Record<PromptCategory, { label: string; prompts: string[] 
   credits: {
     label: "Credits",
     prompts: [
-      "Add a credit payment of $150 for my Visa card.",
+      "Add a credit payment of $150 for my Visa card via bank transfer.",
       "What credit dues are upcoming this week?",
       "Show my current credit utilization summary.",
     ],
@@ -104,12 +111,12 @@ function formatMessageTime(value?: string) {
 
 export default function ChatPage() {
   const queryClient = useQueryClient();
-  const profile = useAuthStore((s) => s.profile);
   const [prompt, setPrompt] = useState("");
   const [currentConversationId, setCurrentConversationId] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState<"assistant" | "history">("assistant");
   const [activePromptCategory, setActivePromptCategory] = useState<PromptCategory>("expenses");
   const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -141,6 +148,9 @@ export default function ChatPage() {
         conversationId: currentConversationId,
       });
     },
+    onMutate: async (value) => {
+      setPendingUserMessage(value);
+    },
     onSuccess: (response) => {
       setCurrentConversationId(response.conversationId);
       queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
@@ -170,6 +180,9 @@ export default function ChatPage() {
           },
         });
       }
+    },
+    onSettled: () => {
+      setPendingUserMessage(null);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -348,10 +361,24 @@ export default function ChatPage() {
                   </div>
                 ))}
 
-                {sendPrompt.isPending && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Thinking...
+                {pendingUserMessage && (
+                  <div className="space-y-3">
+                    <div className="flex justify-end">
+                      <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-primary text-primary-foreground px-4 py-2.5">
+                        <p className="text-sm whitespace-pre-wrap">{pendingUserMessage}</p>
+                      </div>
+                    </div>
+                    {sendPrompt.isPending && (
+                      <div className="flex justify-start gap-2">
+                        <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-1">
+                          <Bot className="h-4 w-4" />
+                        </div>
+                        <div className="rounded-2xl rounded-bl-sm border bg-card px-4 py-2.5 text-sm text-muted-foreground flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Thinking...
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 <div ref={chatEndRef} />

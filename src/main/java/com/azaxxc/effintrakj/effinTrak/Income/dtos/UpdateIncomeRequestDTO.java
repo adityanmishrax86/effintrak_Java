@@ -10,6 +10,7 @@ public class UpdateIncomeRequestDTO {
     private Double amount;
     private String date; // Consider using LocalDate for better date handling
     private Long categoryId;
+    private Long bankAccountId;
     private String source;
     private String note;
     private Long userId;
