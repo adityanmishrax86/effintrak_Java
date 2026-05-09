@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -70,6 +71,14 @@ public class IncomeService {
         income.setDate(formatter.parse(dto.getDate(), java.time.LocalDate::from));
 
         return incomeRepository.save(income);
+    }
+
+    public List<Income> saveIncomes(List<NewIncomeRequestDTO> dtos, User user) {
+        List<Income> savedIncomes = new ArrayList<>();
+        for (NewIncomeRequestDTO dto : dtos) {
+            savedIncomes.add(saveIncome(dto, user));
+        }
+        return savedIncomes;
     }
 
     public Page<IncomeResponse> getIncomeByUserId(Long userId, Pageable pageable) {

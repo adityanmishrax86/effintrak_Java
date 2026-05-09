@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -83,6 +84,30 @@ class ExpenseControllerIntegrationTest {
         mockMvc.perform(post("/api/expenses")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser
+    void createExpenseBulk_WithValidData_ShouldReturnSuccess() throws Exception {
+        NewExpenseRequestDTO dto = new NewExpenseRequestDTO();
+        dto.setDescription("Breakfast");
+        dto.setAmount(18.0);
+        dto.setDate(LocalDate.now().toString());
+        dto.setCategoryId(1L);
+        dto.setBankAccountId(1L);
+        dto.setUserId(1L);
+
+        User user = new User();
+        user.setId(1L);
+
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(1L);
+        when(userService.findById(1L)).thenReturn(Optional.of(user));
+        when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
+
+        mockMvc.perform(post("/api/expenses/bulk")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(dto, dto))))
                 .andExpect(status().isOk());
     }
 

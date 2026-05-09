@@ -40,6 +40,7 @@ import java.util.Currency;
 import java.util.Comparator;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
@@ -109,6 +110,25 @@ public class FinanceTools {
             return "Success: Expense of " + formatCurrency(userId, amount) + " recorded via " + (paymentMethod != null ? paymentMethod : "default payment method");
         } catch (Exception e) {
             logger.error("Failed to add expense", e);
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    public String addExpensesBulkTool(List<NewExpenseRequestDTO> dtos, long userId) {
+        try {
+            Optional<User> userOpt = userService.findById(userId);
+            if (userOpt.isEmpty()) {
+                return "Error: User not found";
+            }
+            if (dtos == null || dtos.isEmpty()) {
+                return "Error: No expenses provided";
+            }
+
+            dtos.forEach(dto -> dto.setUserId(userId));
+            expenseService.saveExpenses(dtos, userOpt.get());
+            return "Success: Recorded " + dtos.size() + " expense entries.";
+        } catch (Exception e) {
+            logger.error("Failed to add expenses in bulk", e);
             return "Error: " + e.getMessage();
         }
     }
@@ -198,6 +218,25 @@ public class FinanceTools {
             return "Success: Income of " + formatCurrency(userId, amount) + " recorded from " + (source != null ? source : "unknown source");
         } catch (Exception e) {
             logger.error("Failed to add income", e);
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    public String addIncomesBulkTool(List<NewIncomeRequestDTO> dtos, long userId) {
+        try {
+            Optional<User> userOpt = userService.findById(userId);
+            if (userOpt.isEmpty()) {
+                return "Error: User not found";
+            }
+            if (dtos == null || dtos.isEmpty()) {
+                return "Error: No incomes provided";
+            }
+
+            dtos.forEach(dto -> dto.setUserId(userId));
+            incomeService.saveIncomes(dtos, userOpt.get());
+            return "Success: Recorded " + dtos.size() + " income entries.";
+        } catch (Exception e) {
+            logger.error("Failed to add incomes in bulk", e);
             return "Error: " + e.getMessage();
         }
     }

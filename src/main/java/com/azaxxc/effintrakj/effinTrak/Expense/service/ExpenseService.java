@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -71,6 +72,14 @@ public class ExpenseService {
         expense.setDate(formatter.parse(dto.getDate(), java.time.LocalDate::from));
 
         return expenseRepository.save(expense);
+    }
+
+    public List<Expense> saveExpenses(List<NewExpenseRequestDTO> dtos, User user) {
+        List<Expense> savedExpenses = new ArrayList<>();
+        for (NewExpenseRequestDTO dto : dtos) {
+            savedExpenses.add(saveExpense(dto, user));
+        }
+        return savedExpenses;
     }
 
     public Page<ExpenseResponse> getExpenseByUserId(Long userId, Pageable pageable) {

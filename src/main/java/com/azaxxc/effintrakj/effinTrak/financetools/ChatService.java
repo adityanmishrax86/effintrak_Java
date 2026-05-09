@@ -6,6 +6,8 @@ import com.azaxxc.effintrakj.effinTrak.financetools.config.ChatSystemConfig;
 import com.azaxxc.effintrakj.effinTrak.financetools.config.PromptRegistry;
 import com.azaxxc.effintrakj.effinTrak.financetools.config.PromptTemplateService;
 import com.azaxxc.effintrakj.effinTrak.financetools.dtos.AIExecutionResult;
+import com.azaxxc.effintrakj.effinTrak.Expense.dtos.NewExpenseRequestDTO;
+import com.azaxxc.effintrakj.effinTrak.Income.dtos.NewIncomeRequestDTO;
 import com.azaxxc.effintrakj.effinTrak.financetools.exceptions.*;
 import com.azaxxc.effintrakj.effinTrak.financetools.guardrails.AIGuardrails;
 import com.azaxxc.effintrakj.effinTrak.financetools.guardrails.AIToolPolicy;
@@ -1048,8 +1050,7 @@ public class ChatService {
             return null;
         }
 
-        List<String> results = new ArrayList<>();
-        int successCount = 0;
+        List<NewExpenseRequestDTO> dtos = new ArrayList<>();
         for (String line : lines) {
             double amount = extractNumber(line, "AMOUNT");
             long categoryId = extractNumber(line, "CATEGORY_ID").longValue();
@@ -1059,14 +1060,18 @@ public class ChatService {
             String paymentMethod = normalizeOptionalField(extractText(line, "PAYMENT_METHOD"));
             String paidTo = normalizeOptionalField(extractText(line, "PAID_TO"));
 
-            String result = financeTools.addExpenseTool(amount, categoryId, bankAccountId, date, description, paymentMethod, paidTo, userId);
-            results.add(result);
-            if (result.startsWith("Success:")) {
-                successCount++;
-            }
+            NewExpenseRequestDTO dto = new NewExpenseRequestDTO();
+            dto.setAmount(amount);
+            dto.setCategoryId(categoryId);
+            dto.setBankAccountId(bankAccountId);
+            dto.setDate(date);
+            dto.setDescription(description);
+            dto.setPaymentMethod(paymentMethod);
+            dto.setPaidTo(paidTo);
+            dto.setRecurring(false);
+            dtos.add(dto);
         }
-        return "Processed " + lines.size() + " expense entries. Success: " + successCount + ", Failed: " + (lines.size() - successCount)
-                + "\n" + String.join("\n", results);
+        return financeTools.addExpensesBulkTool(dtos, userId);
     }
 
     private String handleBatchAddIncome(String prompt, long userId, String userContext, String todayDate) {
@@ -1079,8 +1084,7 @@ public class ChatService {
             return null;
         }
 
-        List<String> results = new ArrayList<>();
-        int successCount = 0;
+        List<NewIncomeRequestDTO> dtos = new ArrayList<>();
         for (String line : lines) {
             double amount = extractNumber(line, "AMOUNT");
             String date = extractDate(line, "DATE");
@@ -1090,14 +1094,17 @@ public class ChatService {
             String source = normalizeOptionalField(extractText(line, "SOURCE"));
             String note = normalizeOptionalField(extractText(line, "NOTE"));
 
-            String result = financeTools.addIncomeTool(amount, description, source, note, bankAccountId, date, categoryId, userId);
-            results.add(result);
-            if (result.startsWith("Success:")) {
-                successCount++;
-            }
+            NewIncomeRequestDTO dto = new NewIncomeRequestDTO();
+            dto.setAmount(amount);
+            dto.setDate(date);
+            dto.setDescription(description);
+            dto.setCategoryId(categoryId);
+            dto.setBankAccountId(bankAccountId);
+            dto.setSource(source);
+            dto.setNote(note);
+            dtos.add(dto);
         }
-        return "Processed " + lines.size() + " income entries. Success: " + successCount + ", Failed: " + (lines.size() - successCount)
-                + "\n" + String.join("\n", results);
+        return financeTools.addIncomesBulkTool(dtos, userId);
     }
 
     private List<String> parseBatchLines(String batchParams) {

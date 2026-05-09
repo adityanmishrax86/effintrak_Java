@@ -88,6 +88,30 @@ class IncomeControllerIntegrationTest {
 
     @Test
     @WithMockUser
+    void createIncomeBulk_WithValidData_ShouldReturnSuccess() throws Exception {
+        NewIncomeRequestDTO dto = new NewIncomeRequestDTO();
+        dto.setDescription("Freelance");
+        dto.setAmount(100.0);
+        dto.setDate(LocalDate.now().toString());
+        dto.setCategoryId(1L);
+        dto.setBankAccountId(1L);
+        dto.setUserId(1L);
+
+        User user = new User();
+        user.setId(1L);
+
+        when(authenticatedUserResolver.resolveRequestedUserId(any(), anyLong())).thenReturn(1L);
+        when(userService.findById(1L)).thenReturn(Optional.of(user));
+        when(globalResponseService.success(any(), anyString())).thenReturn(org.springframework.http.ResponseEntity.ok().build());
+
+        mockMvc.perform(post("/api/incomes/bulk")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(dto, dto))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser
     void getIncomeByUserId_ShouldReturnIncomes() throws Exception {
         // Given
         Long userId = 1L;

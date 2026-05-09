@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/incomes")
@@ -50,6 +51,22 @@ public class IncomeController {
 
         Income savedIncome = incomeService.saveIncome(dto, user);
         return globalResponseService.success("Income added successfully");
+    }
+
+    @PostMapping("/bulk")
+    public ResponseEntity<Object> createIncomeBulk(@Valid @RequestBody List<NewIncomeRequestDTO> dtos, Authentication authentication) {
+        if (dtos == null || dtos.isEmpty()) {
+            throw new IllegalArgumentException("At least one income is required.");
+        }
+
+        Long requestedUserId = dtos.getFirst().getUserId();
+        Long userId = authenticatedUserResolver.resolveRequestedUserId(authentication, requestedUserId);
+        User user = userService.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
+
+        dtos.forEach(dto -> dto.setUserId(userId));
+        incomeService.saveIncomes(dtos, user);
+        return globalResponseService.success(Map.of("count", dtos.size()), "Incomes added successfully");
     }
 
     @GetMapping("/user/{userId}")

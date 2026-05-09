@@ -21,6 +21,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/expenses")
@@ -48,6 +49,22 @@ public class ExpenseController {
         expenseService.saveExpense(dto, user);
         return globalResponseService.success("Expense added successfully");
 
+    }
+
+    @PostMapping("/bulk")
+    public ResponseEntity<Object> createExpensesBulk(@Valid @RequestBody List<NewExpenseRequestDTO> dtos, Authentication authentication) {
+        if (dtos == null || dtos.isEmpty()) {
+            throw new IllegalArgumentException("At least one expense is required.");
+        }
+
+        Long requestedUserId = dtos.getFirst().getUserId();
+        Long userId = authenticatedUserResolver.resolveRequestedUserId(authentication, requestedUserId);
+        User user = userService.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
+
+        dtos.forEach(dto -> dto.setUserId(userId));
+        expenseService.saveExpenses(dtos, user);
+        return globalResponseService.success(Map.of("count", dtos.size()), "Expenses added successfully");
     }
 
     @GetMapping("/user/{userId}")
